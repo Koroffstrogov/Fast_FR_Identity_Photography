@@ -189,7 +189,13 @@ function getRenderedPhotoCanvas(
   }
 
   const canvas = document.createElement("canvas");
-  renderPhotoToCanvas(canvas, item.image, item.editState.transform);
+  renderPhotoToCanvas(
+    canvas,
+    item.image,
+    item.editState.transform,
+    item.backgroundEdit,
+    "export",
+  );
   renderedPhotos.set(item.id, canvas);
 
   return canvas;

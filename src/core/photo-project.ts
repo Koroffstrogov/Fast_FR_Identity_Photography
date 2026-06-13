@@ -8,6 +8,36 @@ export type PhotoEditState = {
 
 export type PhotoUsage = "college" | "sport" | "badge" | "autre";
 
+export type BackgroundPreviewMode = "original" | "replace" | "mask-preview";
+
+export type BackgroundPoint = {
+  x: number;
+  y: number;
+};
+
+export type BackgroundMaskData = {
+  width: number;
+  height: number;
+  data: Float32Array;
+  labels: string[];
+  source: "confidence" | "category";
+};
+
+export type BackgroundEditState = {
+  enabled: boolean;
+  replacementColor: string;
+  mode: BackgroundPreviewMode;
+  threshold: number;
+  featherPx: number;
+  edgeSmoothingPx: number;
+  preserveHair: boolean;
+  manualForegroundPoints: BackgroundPoint[];
+  manualBackgroundPoints: BackgroundPoint[];
+  maskVersion: number;
+  rawMask?: BackgroundMaskData;
+  message: string;
+};
+
 export type PhotoManualFacePointKind = "eyesCenter" | "chin" | "skullTop";
 
 export type PhotoManualFacePoint = {
@@ -15,6 +45,8 @@ export type PhotoManualFacePoint = {
   xPx: number;
   yPx: number;
 };
+
+export type PhotoFacePointEditMode = "none" | "place" | "move";
 
 export type PhotoFaceDiagnostic = {
   code: string;
@@ -33,6 +65,8 @@ export type PhotoFaceDetectionStatus =
 export type PhotoFaceDetectionState = {
   status: PhotoFaceDetectionStatus;
   manualAssistantEnabled: boolean;
+  showFacePoints: boolean;
+  pointEditMode: PhotoFacePointEditMode;
   manualPoints: PhotoManualFacePoint[];
   diagnostics: PhotoFaceDiagnostic[];
   message: string;
@@ -48,6 +82,7 @@ export type PhotoItem<TImage = HTMLImageElement> = {
   image: TImage;
   editState: PhotoEditState;
   faceDetection?: PhotoFaceDetectionState;
+  backgroundEdit?: BackgroundEditState;
   sheetCopies: number;
 };
 
@@ -60,6 +95,7 @@ export type CreatePhotoItemInput<TImage = HTMLImageElement> = {
 
 export const DEFAULT_FACE_GUIDE_OPACITY = 0.82;
 export const DEFAULT_SHEET_COPIES = 1;
+export const DEFAULT_BACKGROUND_REPLACEMENT_COLOR = "#eeeeee";
 
 export function getDefaultPhotoEditState(): PhotoEditState {
   return {
@@ -73,8 +109,27 @@ export function getDefaultPhotoFaceDetectionState(): PhotoFaceDetectionState {
   return {
     status: "idle",
     manualAssistantEnabled: false,
+    showFacePoints: true,
+    pointEditMode: "none",
     manualPoints: [],
     diagnostics: [],
+    message: "",
+  };
+}
+
+export function getDefaultBackgroundEditState(): BackgroundEditState {
+  return {
+    enabled: false,
+    replacementColor: DEFAULT_BACKGROUND_REPLACEMENT_COLOR,
+    mode: "original",
+    threshold: 0.5,
+    featherPx: 6,
+    edgeSmoothingPx: 2,
+    preserveHair: true,
+    manualForegroundPoints: [],
+    manualBackgroundPoints: [],
+    maskVersion: 0,
+    rawMask: undefined,
     message: "",
   };
 }
@@ -92,6 +147,7 @@ export function createPhotoItem<TImage>(
     image: input.image,
     editState: getDefaultPhotoEditState(),
     faceDetection: getDefaultPhotoFaceDetectionState(),
+    backgroundEdit: getDefaultBackgroundEditState(),
     sheetCopies: DEFAULT_SHEET_COPIES,
   };
 }
@@ -174,6 +230,16 @@ export function upsertManualFacePoint(
   );
 }
 
+export function hasAllFacePoints(
+  manualPoints: readonly PhotoManualFacePoint[],
+): boolean {
+  return (
+    manualPoints.some((point) => point.kind === "eyesCenter") &&
+    manualPoints.some((point) => point.kind === "chin") &&
+    manualPoints.some((point) => point.kind === "skullTop")
+  );
+}
+
 export function getManualFacePointLabel(kind: PhotoManualFacePointKind): string {
   switch (kind) {
     case "eyesCenter":
@@ -183,6 +249,40 @@ export function getManualFacePointLabel(kind: PhotoManualFacePointKind): string 
     case "skullTop":
       return "Sommet";
   }
+}
+
+export function addBackgroundPoint(
+  backgroundEdit: BackgroundEditState,
+  pointType: "foreground" | "background",
+  point: BackgroundPoint,
+): BackgroundEditState {
+  const nextEdit = {
+    ...backgroundEdit,
+    maskVersion: backgroundEdit.maskVersion + 1,
+  };
+
+  if (pointType === "foreground") {
+    return {
+      ...nextEdit,
+      manualForegroundPoints: [...backgroundEdit.manualForegroundPoints, point],
+    };
+  }
+
+  return {
+    ...nextEdit,
+    manualBackgroundPoints: [...backgroundEdit.manualBackgroundPoints, point],
+  };
+}
+
+export function resetBackgroundPoints(
+  backgroundEdit: BackgroundEditState,
+): BackgroundEditState {
+  return {
+    ...backgroundEdit,
+    manualForegroundPoints: [],
+    manualBackgroundPoints: [],
+    maskVersion: backgroundEdit.maskVersion + 1,
+  };
 }
 
 function getDefaultDisplayName(fileName: string): string {

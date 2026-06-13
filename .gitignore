@@ -6,3 +6,4 @@ playwright-report/
 .vite/
 *.local
 public/models/mediapipe/*.task
+public/models/mediapipe/*.tflite

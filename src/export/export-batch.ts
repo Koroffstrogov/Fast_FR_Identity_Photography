@@ -61,7 +61,13 @@ export function downloadBlob(blob: Blob, fileName: string): void {
 
 function renderPhotoToJpegBlob(photo: PhotoItem): Promise<Blob> {
   const canvas = document.createElement("canvas");
-  renderPhotoToCanvas(canvas, photo.image, photo.editState.transform);
+  renderPhotoToCanvas(
+    canvas,
+    photo.image,
+    photo.editState.transform,
+    photo.backgroundEdit,
+    "export",
+  );
 
   return new Promise((resolve, reject) => {
     canvas.toBlob(

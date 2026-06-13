@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { getFranceOfficialFaceGuide } from "../core/face-guide";
 import { DEFAULT_IMAGE_TRANSFORM, ZOOM_MAX, ZOOM_MIN } from "../core/geometry";
+import { PHOTO_FORMAT } from "../core/photo-format";
 import { PhotoManualFacePoint } from "../core/photo-project";
 import {
   canvasPointToSourceImagePoint,
+  createFacePlacementFromCandidate,
   createFacePlacementFromManualPoints,
   createFacePlacementFromSourcePoints,
   sourceImagePointToCanvasPoint,
@@ -80,6 +83,64 @@ describe("face placement", () => {
     expect(placement.transform?.rotationDegrees).toBeLessThan(0);
   });
 
+  it("prioritizes the automatic skull top and chin over the indicative eye line", () => {
+    const placementFromCandidate = createFacePlacementFromCandidate(
+      {
+        index: 0,
+        landmarks: [],
+        leftEye: { x: 0.36, y: 0.42 },
+        rightEye: { x: 0.64, y: 0.42 },
+        eyesCenter: { x: 0.5, y: 0.42 },
+        chin: { x: 0.5, y: 0.78 },
+        estimatedSkullTop: { x: 0.5, y: 0.08 },
+        bounds: {
+          minX: 0.32,
+          minY: 0.22,
+          maxX: 0.68,
+          maxY: 0.8,
+          width: 0.36,
+          height: 0.58,
+          area: 0.2088,
+        },
+        rollDegrees: 0,
+        diagnostics: [],
+      },
+      { width: 1000, height: 1000 },
+    );
+    const transform = placementFromCandidate.transform;
+    const imageSize = { width: 1000, height: 1000 };
+    const canvasSize = { width: PHOTO_FORMAT.widthPx, height: PHOTO_FORMAT.heightPx };
+    const guide = getFranceOfficialFaceGuide();
+    const skullTargetY = guideYToCanvasY(guide.skullTopTargetLine.yMm);
+    const chinTargetY = guideYToCanvasY(guide.chinLine.yMm);
+    const eyeTargetY = guideYToCanvasY(guide.eyeLine.yMm);
+
+    expect(transform).not.toBeNull();
+
+    const skullCanvasPoint = sourceImagePointToCanvasPoint(
+      { x: 500, y: 80 },
+      imageSize,
+      canvasSize,
+      transform!,
+    );
+    const chinCanvasPoint = sourceImagePointToCanvasPoint(
+      { x: 500, y: 780 },
+      imageSize,
+      canvasSize,
+      transform!,
+    );
+    const eyeCanvasPoint = sourceImagePointToCanvasPoint(
+      { x: 500, y: 420 },
+      imageSize,
+      canvasSize,
+      transform!,
+    );
+
+    expect(skullCanvasPoint.y).toBeCloseTo(skullTargetY, 1);
+    expect(chinCanvasPoint.y).toBeCloseTo(chinTargetY, 1);
+    expect(Math.abs(eyeCanvasPoint.y - eyeTargetY)).toBeGreaterThan(4);
+  });
+
   it("round-trips a canvas point through source image coordinates", () => {
     const imageSize = { width: 1000, height: 800 };
     const canvasSize = { width: 413, height: 531 };
@@ -123,3 +184,7 @@ describe("face placement", () => {
     expect(placement.message).toContain("manuel");
   });
 });
+
+function guideYToCanvasY(yMm: number): number {
+  return (yMm / getFranceOfficialFaceGuide().photoHeightMm) * PHOTO_FORMAT.heightPx;
+}

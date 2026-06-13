@@ -6,23 +6,19 @@ const SAMPLE_PNG = Buffer.from(
   "base64",
 );
 
-test("loads multiple local images, edits the active photo, and previews a multi-person sheet", async ({
+test("uses the desktop shell modes while keeping photo, sheet, background, and export flows available", async ({
   page,
 }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /photo d'identite/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Photo ID 35x45" })).toBeVisible();
+
+  for (const modeLabel of ["Cadrer", "Fond", "Qualite", "Planche", "Export"]) {
+    await expect(page.getByRole("button", { name: modeLabel, exact: true })).toBeVisible();
+  }
 
   const canvas = page.getByLabel("Apercu photo 35 par 45 millimetres");
   await expect(canvas).toHaveAttribute("width", "413");
   await expect(canvas).toHaveAttribute("height", "531");
-
-  const sheetCanvas = page.getByLabel("Apercu planche A4 imprimable");
-  await expect(sheetCanvas).toHaveAttribute("width", "2480");
-  await expect(sheetCanvas).toHaveAttribute("height", "3508");
-
-  const finalPreviewCanvas = page.getByLabel("Apercu photo finale 35 par 45 millimetres");
-  await expect(finalPreviewCanvas).toHaveAttribute("width", "413");
-  await expect(finalPreviewCanvas).toHaveAttribute("height", "531");
 
   const pageOrigin = new URL(page.url()).origin;
   const externalRequestsAfterLoad: string[] = [];
@@ -53,7 +49,8 @@ test("loads multiple local images, edits the active photo, and previews a multi-
   await expect(page.getByText("alice.png")).toBeVisible();
   await expect(page.getByText("bob.png")).toBeVisible();
   await expect(page.getByText("2 images importees.")).toBeVisible();
-  await expect(page.getByText("Total demande : 2 / 30 places.")).toBeVisible();
+  await expect(page.getByText("2 photos / 30 places")).toBeVisible();
+  await expect(canvas).toBeVisible();
 
   await page.getByRole("textbox", { name: "Prenom alice.png", exact: true }).fill("Alice");
   await page.getByRole("textbox", { name: "Nom alice.png", exact: true }).fill("Dupont");
@@ -65,38 +62,51 @@ test("loads multiple local images, edits the active photo, and previews a multi-
   await page.getByLabel("Usage bob.png").selectOption("sport");
   await page.getByRole("button", { name: "Generer nom affiche" }).nth(1).click();
 
+  await page.getByRole("button", { name: "Export", exact: true }).click();
   await page.getByLabel("Modele de nommage").selectOption("lastFirstIdentity");
   await expect(page.getByText("Fichier : sport_elea_photo-identite.jpg")).toBeVisible();
 
   await page.getByRole("spinbutton", { name: "Copies alice.png" }).fill("4");
   await page.getByRole("spinbutton", { name: "Copies bob.png" }).fill("6");
+
+  await page.getByRole("button", { name: "Planche", exact: true }).click();
+  const sheetCanvas = page.getByLabel("Apercu planche A4 imprimable");
+  await expect(sheetCanvas).toHaveAttribute("width", "2480");
+  await expect(sheetCanvas).toHaveAttribute("height", "3508");
   await expect(page.getByText("Total demande : 10 / 30 places.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Export planche A4" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Imprimer A4" })).toBeEnabled();
-  await expect(page.getByRole("button", { name: "Exporter toutes les photos en ZIP" })).toBeEnabled();
-  await expect(page.getByRole("button", { name: "Telecharger separement" })).toBeEnabled();
-  await expect(page.getByRole("heading", { name: "Photo finale 35x45" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Apercu planche A4" })).toBeVisible();
 
   await page.locator('input[name="sheet-mode"][value="comfort"]').check({ force: true });
   await expect(page.getByText("Total demande : 10 / 25 places.")).toBeVisible();
   await page.locator('input[name="sheet-mode"][value="standard"]').check({ force: true });
   await expect(page.getByText("Total demande : 10 / 30 places.")).toBeVisible();
 
+  const sheetDataBeforeGuideToggle = await sheetCanvas.evaluate((node) =>
+    (node as HTMLCanvasElement).toDataURL("image/jpeg"),
+  );
+
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Export JPEG" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Exporter toutes les photos en ZIP" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Telecharger separement" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Export planche A4" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Imprimer A4" })).toBeEnabled();
+
+  await page.getByRole("button", { name: "Cadrer", exact: true }).click();
   await page.getByRole("button", { name: "Choisir bob.png" }).click();
   await expect(page.getByRole("heading", { name: "Éléa Sport" })).toBeVisible();
   await expect(page.getByLabel("Afficher le guide visage")).toBeChecked();
-  await expect(page.getByRole("button", { name: "Detecter le visage" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Placer les points automatiquement" }),
+  ).toBeVisible();
 
-  await page.getByRole("button", { name: "Detecter le visage" }).click();
+  await page.getByRole("button", { name: "Placer les points automatiquement" }).click();
   await expect(
     page.getByText(/Impossible de charger le modele visage local|Aucun visage exploitable/),
   ).toBeVisible();
 
   const photoDataBeforeGuideToggle = await canvas.evaluate((node) =>
-    (node as HTMLCanvasElement).toDataURL("image/jpeg"),
-  );
-  const sheetDataBeforeGuideToggle = await sheetCanvas.evaluate((node) =>
     (node as HTMLCanvasElement).toDataURL("image/jpeg"),
   );
 
@@ -105,10 +115,13 @@ test("loads multiple local images, edits the active photo, and previews a multi-
   expect(
     await canvas.evaluate((node) => (node as HTMLCanvasElement).toDataURL("image/jpeg")),
   ).toBe(photoDataBeforeGuideToggle);
+
+  await page.getByRole("button", { name: "Planche", exact: true }).click();
   expect(
     await sheetCanvas.evaluate((node) => (node as HTMLCanvasElement).toDataURL("image/jpeg")),
   ).toBe(sheetDataBeforeGuideToggle);
 
+  await page.getByRole("button", { name: "Cadrer", exact: true }).click();
   await page.getByLabel("Afficher le guide visage").check();
   await page.getByRole("slider", { name: "Opacite du guide" }).evaluate((input) => {
     const range = input as HTMLInputElement;
@@ -120,23 +133,58 @@ test("loads multiple local images, edits the active photo, and previews a multi-
     await canvas.evaluate((node) => (node as HTMLCanvasElement).toDataURL("image/jpeg")),
   ).toBe(photoDataBeforeGuideToggle);
 
-  await page.getByLabel("Assistant manuel visage").check();
-  await expect(page.getByText("Points manuels : 0/3.")).toBeVisible();
-
+  await expect(page.getByLabel("Afficher les points du visage")).toBeChecked();
+  await page.getByLabel("Afficher les points du visage").uncheck();
+  await expect(page.getByLabel("Afficher les points du visage")).not.toBeChecked();
+  await page.getByLabel("Afficher les points du visage").check();
+  await page.getByRole("button", { name: "Placer les points du visage manuellement" }).click();
+  await expect(page.getByText("Points visage : 0/3.")).toBeVisible();
   await canvas.click({ position: { x: 206, y: 239 } });
-  await expect(page.getByText("1/3 point(s) manuel(s) places.")).toBeVisible();
+  await expect(page.getByText("1/3 point(s) visage place(s).")).toBeVisible();
   await canvas.click({ position: { x: 206, y: 398 } });
-  await expect(page.getByText("2/3 point(s) manuel(s) places.")).toBeVisible();
-
-  expect(
-    await canvas.evaluate((node) => (node as HTMLCanvasElement).toDataURL("image/jpeg")),
-  ).toBe(photoDataBeforeGuideToggle);
+  await expect(page.getByText("2/3 point(s) visage place(s).")).toBeVisible();
+  await canvas.click({ position: { x: 206, y: 120 } });
+  await expect(page.getByText("3/3 point(s) visage place(s).")).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Appliquer le cadrage manuel" }),
+    page.getByRole("button", { name: "Cadrer a partir de points" }),
   ).toBeEnabled();
-  await page.getByRole("button", { name: "Reinitialiser les points" }).click();
-  await expect(page.getByText("Points manuels : 0/3.")).toBeVisible();
-  await page.getByLabel("Assistant manuel visage").uncheck();
+  await expect(page.getByRole("button", { name: "Deplacer un point" })).toBeEnabled();
+  await page.getByRole("button", { name: "Supprimer les points" }).click();
+  await expect(page.getByText("Points visage : 0/3.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Fond", exact: true }).click();
+  await expect(canvas).toBeVisible();
+  const backgroundGroup = page.getByRole("group", { name: "Fond" });
+  await expect(backgroundGroup.getByRole("button", { name: "Supprimer le fond" })).toBeVisible();
+  await backgroundGroup.getByRole("button", { name: "Charger le modele fond" }).click();
+  await expect(backgroundGroup.getByText("Modele : pret")).toBeVisible();
+  await page.getByLabel("Remplacer le fond dans les exports").check();
+  await expect(page.getByLabel("Remplacer le fond dans les exports")).toBeChecked();
+  await page.getByLabel("Couleur de fond").evaluate((input) => {
+    const colorInput = input as HTMLInputElement;
+    colorInput.value = "#dbeafe";
+    colorInput.dispatchEvent(new Event("input", { bubbles: true }));
+    colorInput.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page
+    .locator('input[name="background-preview-mode"][value="mask-preview"]')
+    .evaluate((input) => {
+      const radio = input as HTMLInputElement;
+      radio.checked = true;
+      radio.dispatchEvent(new Event("input", { bubbles: true }));
+      radio.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  await page.getByRole("button", { name: "Ajouter point fond a supprimer" }).click();
+  await canvas.click({ position: { x: 120, y: 120 } });
+  await expect(page.getByText("Point fond ajoute.")).toBeVisible();
+  await expect(page.getByText("Points : 0 personne, 1 fond.")).toBeVisible();
+  await page.getByRole("button", { name: "Ajouter point fond a supprimer" }).click();
+  await page.getByRole("button", { name: "Effacer les points" }).click();
+  await expect(page.getByText("Points : 0 personne, 0 fond.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Qualite", exact: true }).click();
+  await expect(canvas).toBeVisible();
+  await expect(page.getByText("Diagnostic qualite prevu pour un prochain lot.")).toBeVisible();
 
   await page.getByRole("slider", { name: "Zoom" }).evaluate((input) => {
     const range = input as HTMLInputElement;
@@ -175,15 +223,44 @@ test("loads multiple local images, edits the active photo, and previews a multi-
     await page.mouse.up();
   }
 
+  await page.getByRole("button", { name: "Planche", exact: true }).click();
   await expect
     .poll(async () => (await sheetCanvas.evaluate((node) =>
       (node as HTMLCanvasElement).toDataURL("image/jpeg"),
     )).length)
     .toBeGreaterThan(1000);
 
+  await page.getByRole("button", { name: "Export", exact: true }).click();
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export JPEG" }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("sport_elea_photo-identite.jpg");
   expect(externalRequestsAfterLoad).toEqual([]);
+});
+
+test("shows a clear background model error and keeps editing usable", async ({ page }) => {
+  await page.route("**/models/mediapipe/selfie_segmenter.tflite", async (route) => {
+    await route.fulfill({
+      status: 404,
+      contentType: "text/plain",
+      body: "missing model",
+    });
+  });
+
+  await page.goto("/");
+  await page.getByLabel("Images locales").setInputFiles([
+    {
+      name: "missing-background-model.png",
+      mimeType: "image/png",
+      buffer: SAMPLE_PNG,
+    },
+  ]);
+
+  await page.getByRole("button", { name: "Fond", exact: true }).click();
+  await page.getByRole("button", { name: "Charger le modele fond" }).click();
+  await expect(page.getByText(/Impossible de charger le modele de fond local/)).toBeVisible();
+  await expect(page.getByRole("slider", { name: "Zoom" })).toBeEnabled();
+
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Export JPEG" })).toBeEnabled();
 });

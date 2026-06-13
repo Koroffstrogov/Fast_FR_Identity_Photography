@@ -26,12 +26,16 @@ import {
 } from "../core/file-naming";
 import {
   PhotoItem,
+  PhotoManualFacePointKind,
   PhotoUsage,
+  addBackgroundPoint,
   clampCopies,
+  getDefaultBackgroundEditState,
   getDefaultPhotoFaceDetectionState,
   getManualFacePointLabel,
   getNextActivePhotoId,
   getNextManualFacePointKind,
+  hasAllFacePoints,
   removePhotoItem,
   updatePhotoItem,
   upsertManualFacePoint,
@@ -49,11 +53,13 @@ import {
 } from "../export/export-batch";
 import { createPhotosZip, downloadZip } from "../export/export-zip";
 import { openA4PrintPage } from "../print/open-print-page";
-import { ExportPanel } from "./ExportPanel";
-import { FinalPhotoPreview } from "./FinalPhotoPreview";
-import { PhotoEditor } from "./PhotoEditor";
-import { PhotoList } from "./PhotoList";
-import { SheetPreview } from "./SheetPreview";
+import { BackgroundPointMode } from "./BackgroundPanel";
+import { BottomToolbar } from "./BottomToolbar";
+import { LeftPhotoPanel } from "./LeftPhotoPanel";
+import { RightInspector } from "./RightInspector";
+import { TopBar } from "./TopBar";
+import { Workspace } from "./Workspace";
+import { AppMode } from "./app-mode";
 import {
   FaceLandmarkerModelStatus,
   detectFaceLandmarks,
@@ -62,16 +68,32 @@ import {
 } from "../vision/face-landmarker";
 import { analyzeFaceLandmarks } from "../vision/face-landmarks";
 import {
+  createFacePointsFromCandidate,
+  findNearestFacePointKind,
+} from "../vision/face-points";
+import {
   canvasPointToSourceImagePoint,
-  createFacePlacementFromCandidate,
-  createFacePlacementFromManualPoints,
+  createFacePlacementFromFacePoints,
   sourceImagePointToCanvasPoint,
 } from "../vision/face-placement";
+import {
+  BackgroundSegmenterStatus,
+  getBackgroundSegmenterErrorMessage,
+  loadBackgroundSegmenter,
+  segmentImageBackground,
+} from "../vision/background-segmenter";
 
 type DragState = {
+  kind: "photo";
   pointerId: number;
   x: number;
   y: number;
+};
+
+type FacePointDragState = {
+  kind: "face-point";
+  pointerId: number;
+  pointKind: PhotoManualFacePointKind;
 };
 
 let photoIdCounter = 0;
@@ -80,18 +102,24 @@ export function App() {
   const photoCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const guideCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const sheetCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const dragStateRef = useRef<DragState | null>(null);
+  const dragStateRef = useRef<DragState | FacePointDragState | null>(null);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [importSummary, setImportSummary] = useState("");
   const [importErrors, setImportErrors] = useState<ImageImportError[]>([]);
+  const [appMode, setAppMode] = useState<AppMode>("crop");
   const [sheetMode, setSheetMode] = useState<PrintLayoutMode>("standard");
   const [fileNamingTemplate, setFileNamingTemplate] =
     useState<FileNamingTemplateId>("displayNameIdentity");
   const [faceModelStatus, setFaceModelStatus] =
     useState<FaceLandmarkerModelStatus>("idle");
   const [faceModelError, setFaceModelError] = useState("");
+  const [backgroundSegmenterStatus, setBackgroundSegmenterStatus] =
+    useState<BackgroundSegmenterStatus>("idle");
+  const [backgroundSegmenterError, setBackgroundSegmenterError] = useState("");
+  const [backgroundPointMode, setBackgroundPointMode] =
+    useState<BackgroundPointMode>("none");
   const sheetCapacity = useMemo(() => getSheetCapacity(sheetMode), [sheetMode]);
   const activePhoto = useMemo(
     () => photos.find((photo) => photo.id === activePhotoId) ?? null,
@@ -110,22 +138,24 @@ export function App() {
     const photoCanvas = photoCanvasRef.current;
     const sheetCanvas = sheetCanvasRef.current;
 
-    if (!photoCanvas || !sheetCanvas) {
-      return;
-    }
-
-    if (activePhoto) {
-      renderPhotoToCanvas(photoCanvas, activePhoto.image, activePhoto.editState.transform);
-    } else {
+    if (photoCanvas && activePhoto) {
+      renderPhotoToCanvas(
+        photoCanvas,
+        activePhoto.image,
+        activePhoto.editState.transform,
+        activePhoto.backgroundEdit,
+        "preview",
+      );
+    } else if (photoCanvas) {
       preparePhotoCanvas(photoCanvas);
     }
 
-    if (photos.length > 0) {
+    if (sheetCanvas && photos.length > 0) {
       renderPhotoItemsToSheetCanvas(sheetCanvas, photos, sheetMode);
-    } else {
+    } else if (sheetCanvas) {
       prepareSheetCanvas(sheetCanvas, sheetMode);
     }
-  }, [activePhoto, photos, sheetMode]);
+  }, [activePhoto, photos, sheetMode, appMode]);
 
   useEffect(() => {
     const guideCanvas = guideCanvasRef.current;
@@ -138,13 +168,13 @@ export function App() {
       renderFaceGuideOverlay(guideCanvas, {
         showGuide: activePhoto.editState.showFaceGuide,
         opacity: activePhoto.editState.faceGuideOpacity,
-        manualPoints: getManualGuideOverlayPoints(activePhoto),
+        manualPoints: getGuideOverlayPoints(activePhoto),
       });
       return;
     }
 
     prepareGuideCanvas(guideCanvas);
-  }, [activePhoto]);
+  }, [activePhoto, appMode]);
 
   useEffect(() => {
     const canvas = photoCanvasRef.current;
@@ -195,7 +225,7 @@ export function App() {
     return () => {
       canvas.removeEventListener("wheel", handleWheel);
     };
-  }, [activePhotoId]);
+  }, [activePhotoId, appMode]);
 
   useEffect(() => {
     setPhotos((currentPhotos) =>
@@ -320,7 +350,7 @@ export function App() {
     void ensureFaceModelLoaded();
   }
 
-  async function handleDetectFace() {
+  async function handlePlaceFacePointsAutomatically() {
     const photo = activePhoto;
 
     if (!photo) {
@@ -333,7 +363,7 @@ export function App() {
         ...(currentPhoto.faceDetection ?? getDefaultPhotoFaceDetectionState()),
         status: "detecting",
         diagnostics: [],
-        message: "Detection visage en cours.",
+        message: "Placement automatique des points visage en cours.",
       },
     }));
 
@@ -369,41 +399,24 @@ export function App() {
         return;
       }
 
-      const placement = createFacePlacementFromCandidate(
+      const diagnostics = dedupeDiagnostics(analysis.diagnostics);
+      const facePoints = createFacePointsFromCandidate(
         analysis.selectedFace,
         getPhotoImageSize(photo),
       );
-      const diagnostics = dedupeDiagnostics([
-        ...analysis.diagnostics,
-        ...placement.diagnostics,
-      ]);
-
-      if (!placement.transform) {
-        updatePhoto(photo.id, (currentPhoto) => ({
-          ...currentPhoto,
-          faceDetection: {
-            ...(currentPhoto.faceDetection ?? getDefaultPhotoFaceDetectionState()),
-            status: "error",
-            diagnostics,
-            message: placement.message,
-          },
-        }));
-        return;
-      }
-
-      const proposedTransform = placement.transform;
 
       updatePhoto(photo.id, (currentPhoto) => ({
         ...currentPhoto,
-        editState: {
-          ...currentPhoto.editState,
-          transform: proposedTransform,
-        },
         faceDetection: {
           ...(currentPhoto.faceDetection ?? getDefaultPhotoFaceDetectionState()),
           status: "detected",
+          manualAssistantEnabled: false,
+          showFacePoints: true,
+          pointEditMode: "move",
+          manualPoints: facePoints,
           diagnostics,
-          message: placement.message,
+          message:
+            "3 points visage places automatiquement. Deplacez-les si besoin, puis cadrez a partir des points.",
         },
       }));
     } catch (detectError) {
@@ -424,7 +437,7 @@ export function App() {
     }
   }
 
-  function handleManualAssistantChange(enabled: boolean) {
+  function handleFaceManualPlacementChange(enabled: boolean) {
     updateActivePhoto((photo) => {
       const faceDetection = photo.faceDetection ?? getDefaultPhotoFaceDetectionState();
 
@@ -434,6 +447,8 @@ export function App() {
           ...faceDetection,
           status: enabled ? "manual" : faceDetection.status,
           manualAssistantEnabled: enabled,
+          pointEditMode: enabled ? "place" : "none",
+          showFacePoints: enabled ? true : faceDetection.showFacePoints,
           message: enabled
             ? "Cliquez centre des yeux, menton, puis sommet du crane si utile."
             : faceDetection.message,
@@ -442,7 +457,44 @@ export function App() {
     });
   }
 
-  function handleApplyManualFacePlacement() {
+  function handleFacePointMoveChange(enabled: boolean) {
+    updateActivePhoto((photo) => {
+      const faceDetection = photo.faceDetection ?? getDefaultPhotoFaceDetectionState();
+
+      return {
+        ...photo,
+        faceDetection: {
+          ...faceDetection,
+          manualAssistantEnabled: false,
+          pointEditMode: enabled ? "move" : "none",
+          showFacePoints: enabled ? true : faceDetection.showFacePoints,
+          message: enabled
+            ? "Cliquez puis glissez un point visage pour le deplacer."
+            : faceDetection.message,
+        },
+      };
+    });
+  }
+
+  function handleFacePointsVisibilityChange(showFacePoints: boolean) {
+    updateActivePhoto((photo) => {
+      const faceDetection = photo.faceDetection ?? getDefaultPhotoFaceDetectionState();
+
+      return {
+        ...photo,
+        faceDetection: {
+          ...faceDetection,
+          showFacePoints,
+          manualAssistantEnabled: showFacePoints
+            ? faceDetection.manualAssistantEnabled
+            : false,
+          pointEditMode: showFacePoints ? faceDetection.pointEditMode : "none",
+        },
+      };
+    });
+  }
+
+  function handleApplyFacePlacementFromPoints() {
     const photo = activePhoto;
 
     if (!photo) {
@@ -450,7 +502,22 @@ export function App() {
     }
 
     const faceDetection = photo.faceDetection ?? getDefaultPhotoFaceDetectionState();
-    const placement = createFacePlacementFromManualPoints(
+
+    if (!hasAllFacePoints(faceDetection.manualPoints)) {
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        faceDetection: {
+          ...(currentPhoto.faceDetection ?? getDefaultPhotoFaceDetectionState()),
+          status: "error",
+          diagnostics: [],
+          message:
+            "Placez les trois points visage : yeux, menton et sommet du crane.",
+        },
+      }));
+      return;
+    }
+
+    const placement = createFacePlacementFromFacePoints(
       faceDetection.manualPoints,
       getPhotoImageSize(photo),
     );
@@ -472,17 +539,145 @@ export function App() {
     }));
   }
 
-  function handleResetManualFacePoints() {
+  function handleDeleteFacePoints() {
     updateActivePhoto((photo) => ({
       ...photo,
       faceDetection: {
         ...(photo.faceDetection ?? getDefaultPhotoFaceDetectionState()),
         status: "manual",
+        manualAssistantEnabled: false,
+        pointEditMode: "none",
         manualPoints: [],
         diagnostics: [],
-        message: "Points manuels reinitialises.",
+        message: "Points visage supprimes.",
       },
     }));
+  }
+
+  async function ensureBackgroundSegmenterLoaded(): Promise<string | null> {
+    if (backgroundSegmenterStatus === "ready") {
+      return null;
+    }
+
+    setBackgroundSegmenterStatus("loading");
+    setBackgroundSegmenterError("");
+
+    try {
+      await loadBackgroundSegmenter();
+      setBackgroundSegmenterStatus("ready");
+      return null;
+    } catch (loadError) {
+      const message =
+        loadError instanceof Error
+          ? loadError.message
+          : getBackgroundSegmenterErrorMessage(loadError);
+      setBackgroundSegmenterStatus("error");
+      setBackgroundSegmenterError(message);
+
+      return message;
+    }
+  }
+
+  function handleLoadBackgroundSegmenter() {
+    void ensureBackgroundSegmenterLoaded();
+  }
+
+  async function handleSegmentBackground() {
+    const photo = activePhoto;
+
+    if (!photo) {
+      return;
+    }
+
+    updatePhoto(photo.id, (currentPhoto) => ({
+      ...currentPhoto,
+      backgroundEdit: {
+        ...(currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState()),
+        message: "Detection du fond en cours.",
+      },
+    }));
+
+    const modelErrorMessage = await ensureBackgroundSegmenterLoaded();
+
+    if (modelErrorMessage) {
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        backgroundEdit: {
+          ...(currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState()),
+          message: modelErrorMessage,
+        },
+      }));
+      return;
+    }
+
+    try {
+      const segmentation = await segmentImageBackground(photo.image);
+      const diagnosticsText =
+        segmentation.diagnostics.length > 0
+          ? ` ${segmentation.diagnostics.join(" ")}`
+          : "";
+
+      updatePhoto(photo.id, (currentPhoto) => {
+        const backgroundEdit =
+          currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState();
+
+        return {
+          ...currentPhoto,
+          backgroundEdit: {
+            ...backgroundEdit,
+            enabled: true,
+            mode: "replace",
+            rawMask: segmentation.mask,
+            maskVersion: backgroundEdit.maskVersion + 1,
+            message:
+              `Fond detecte automatiquement. Verifiez les cheveux et les contours.${diagnosticsText}`,
+          },
+        };
+      });
+      setBackgroundSegmenterError("");
+    } catch (segmentError) {
+      const message =
+        segmentError instanceof Error
+          ? segmentError.message
+          : "Impossible de supprimer le fond sur la photo active.";
+
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        backgroundEdit: {
+          ...(currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState()),
+          message,
+        },
+      }));
+    }
+  }
+
+  function handleBackgroundChange(
+    partialEdit: Partial<NonNullable<PhotoItem["backgroundEdit"]>>,
+  ) {
+    updateActivePhoto((photo) => ({
+      ...photo,
+      backgroundEdit: {
+        ...(photo.backgroundEdit ?? getDefaultBackgroundEditState()),
+        ...partialEdit,
+      },
+    }));
+  }
+
+  function handleResetBackgroundPoints() {
+    updateActivePhoto((photo) => {
+      const backgroundEdit = photo.backgroundEdit ?? getDefaultBackgroundEditState();
+
+      return {
+        ...photo,
+        backgroundEdit: {
+          ...backgroundEdit,
+          manualForegroundPoints: [],
+          manualBackgroundPoints: [],
+          maskVersion: backgroundEdit.maskVersion + 1,
+          message: "Points de correction effaces.",
+        },
+      };
+    });
   }
 
   function handlePointerDown(event: PointerEvent<HTMLCanvasElement>) {
@@ -490,7 +685,9 @@ export function App() {
       return;
     }
 
-    if (activePhoto.faceDetection?.manualAssistantEnabled) {
+    const faceDetection = activePhoto.faceDetection ?? getDefaultPhotoFaceDetectionState();
+
+    if (appMode === "crop" && faceDetection.pointEditMode === "place") {
       event.preventDefault();
       const rect = event.currentTarget.getBoundingClientRect();
       const canvasPoint = getCanvasPointFromClientPoint(
@@ -506,9 +703,7 @@ export function App() {
         },
         PHOTO_CANVAS_SIZE,
       );
-      const pointKind = getNextManualFacePointKind(
-        activePhoto.faceDetection.manualPoints,
-      );
+      const pointKind = getNextManualFacePointKind(faceDetection.manualPoints);
       const sourcePoint = canvasPointToSourceImagePoint(
         canvasPoint,
         getPhotoImageSize(activePhoto),
@@ -530,8 +725,99 @@ export function App() {
             ...faceDetection,
             status: "manual",
             manualAssistantEnabled: true,
+            showFacePoints: true,
+            pointEditMode: "place",
             manualPoints,
-            message: `${manualPoints.length}/3 point(s) manuel(s) places.`,
+            message: `${manualPoints.length}/3 point(s) visage place(s).`,
+          },
+        };
+      });
+      return;
+    }
+
+    if (appMode === "crop" && faceDetection.pointEditMode === "move") {
+      event.preventDefault();
+      const rect = event.currentTarget.getBoundingClientRect();
+      const canvasPoint = getCanvasPointFromClientPoint(
+        {
+          x: event.clientX,
+          y: event.clientY,
+        },
+        {
+          x: rect.left,
+          y: rect.top,
+          width: rect.width,
+          height: rect.height,
+        },
+        PHOTO_CANVAS_SIZE,
+      );
+      const pointKind = findNearestFacePointKind(
+        faceDetection.manualPoints,
+        canvasPoint,
+        getPhotoImageSize(activePhoto),
+        PHOTO_CANVAS_SIZE,
+        activePhoto.editState.transform,
+      );
+
+      if (!pointKind) {
+        updatePhoto(activePhotoId, (photo) => ({
+          ...photo,
+          faceDetection: {
+            ...(photo.faceDetection ?? getDefaultPhotoFaceDetectionState()),
+            message: "Cliquez directement sur un point visage pour le deplacer.",
+          },
+        }));
+        return;
+      }
+
+      event.currentTarget.setPointerCapture(event.pointerId);
+      dragStateRef.current = {
+        kind: "face-point",
+        pointerId: event.pointerId,
+        pointKind,
+      };
+      return;
+    }
+
+    if (backgroundPointMode !== "none") {
+      event.preventDefault();
+      const rect = event.currentTarget.getBoundingClientRect();
+      const canvasPoint = getCanvasPointFromClientPoint(
+        {
+          x: event.clientX,
+          y: event.clientY,
+        },
+        {
+          x: rect.left,
+          y: rect.top,
+          width: rect.width,
+          height: rect.height,
+        },
+        PHOTO_CANVAS_SIZE,
+      );
+      const sourcePoint = canvasPointToSourceImagePoint(
+        canvasPoint,
+        getPhotoImageSize(activePhoto),
+        PHOTO_CANVAS_SIZE,
+        activePhoto.editState.transform,
+      );
+
+      updatePhoto(activePhotoId, (photo) => {
+        const backgroundEdit = photo.backgroundEdit ?? getDefaultBackgroundEditState();
+        const nextBackgroundEdit = addBackgroundPoint(
+          backgroundEdit,
+          backgroundPointMode,
+          sourcePoint,
+        );
+
+        return {
+          ...photo,
+          backgroundEdit: {
+            ...nextBackgroundEdit,
+            message:
+              backgroundPointMode === "foreground"
+                ? "Point personne ajoute."
+                : "Point fond ajoute.",
           },
         };
       });
@@ -540,6 +826,7 @@ export function App() {
 
     event.currentTarget.setPointerCapture(event.pointerId);
     dragStateRef.current = {
+      kind: "photo",
       pointerId: event.pointerId,
       x: event.clientX,
       y: event.clientY,
@@ -550,6 +837,53 @@ export function App() {
     const dragState = dragStateRef.current;
 
     if (!activePhotoId || !dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    if (dragState.kind === "face-point") {
+      if (!activePhoto) {
+        return;
+      }
+
+      const rect = event.currentTarget.getBoundingClientRect();
+      const canvasPoint = getCanvasPointFromClientPoint(
+        {
+          x: event.clientX,
+          y: event.clientY,
+        },
+        {
+          x: rect.left,
+          y: rect.top,
+          width: rect.width,
+          height: rect.height,
+        },
+        PHOTO_CANVAS_SIZE,
+      );
+      const sourcePoint = canvasPointToSourceImagePoint(
+        canvasPoint,
+        getPhotoImageSize(activePhoto),
+        PHOTO_CANVAS_SIZE,
+        activePhoto.editState.transform,
+      );
+
+      updatePhoto(activePhotoId, (photo) => {
+        const faceDetection = photo.faceDetection ?? getDefaultPhotoFaceDetectionState();
+
+        return {
+          ...photo,
+          faceDetection: {
+            ...faceDetection,
+            showFacePoints: true,
+            pointEditMode: "move",
+            manualPoints: upsertManualFacePoint(faceDetection.manualPoints, {
+              kind: dragState.pointKind,
+              xPx: sourcePoint.x,
+              yPx: sourcePoint.y,
+            }),
+            message: `Point ${getManualFacePointLabel(dragState.pointKind)} deplace.`,
+          },
+        };
+      });
       return;
     }
 
@@ -567,6 +901,7 @@ export function App() {
     );
 
     dragStateRef.current = {
+      kind: "photo",
       pointerId: event.pointerId,
       x: event.clientX,
       y: event.clientY,
@@ -652,11 +987,18 @@ export function App() {
   }
 
   function handleExportPhoto() {
-    const canvas = photoCanvasRef.current;
-
-    if (!canvas || !activePhoto) {
+    if (!activePhoto) {
       return;
     }
+
+    const canvas = document.createElement("canvas");
+    renderPhotoToCanvas(
+      canvas,
+      activePhoto.image,
+      activePhoto.editState.transform,
+      activePhoto.backgroundEdit,
+      "export",
+    );
 
     const link = document.createElement("a");
     link.href = exportCanvasToJpeg(canvas);
@@ -734,95 +1076,92 @@ export function App() {
   }
 
   return (
-    <main className="app-shell">
-      <section className="workspace" aria-labelledby="app-title">
-        <div className="intro">
-          <p className="eyebrow">Traitement local</p>
-          <h1 id="app-title">Photo d'identite 35 x 45 mm</h1>
-          <p>
-            Importez plusieurs images depuis ce PC, cadrez chaque personne, puis
-            generez une planche A4 avec le nombre de copies voulu.
-          </p>
-        </div>
+    <div className="app-shell">
+      <TopBar
+        mode={appMode}
+        photoCount={photos.length}
+        sheetCapacity={sheetCapacity}
+        onModeChange={setAppMode}
+        onFileChange={handleFileChange}
+      />
 
-        <label className="file-control import-control">
-          <span>Images locales</span>
-          <input type="file" accept="image/*" multiple onChange={handleFileChange} />
-        </label>
+      <div className="app-main-grid">
+        <LeftPhotoPanel
+          photos={photos}
+          activePhotoId={activePhotoId}
+          sheetCapacity={sheetCapacity}
+          fileNamingTemplate={fileNamingTemplate}
+          error={error}
+          importSummary={importSummary}
+          importErrors={importErrors}
+          onFileChange={handleFileChange}
+          onSelectPhoto={setActivePhotoId}
+          onDisplayNameChange={handleDisplayNameChange}
+          onFirstNameChange={handleFirstNameChange}
+          onLastNameChange={handleLastNameChange}
+          onUsageChange={handleUsageChange}
+          onGenerateDisplayName={handleGenerateDisplayName}
+          onCopiesChange={handleCopiesChange}
+          onRemovePhoto={handleRemovePhoto}
+        />
 
-        {error && <p className="error" role="alert">{error}</p>}
-        {importSummary && <p className="import-summary">{importSummary}</p>}
-        {importErrors.length > 0 && (
-          <ul className="import-errors" aria-label="Fichiers ignores">
-            {importErrors.map((importError) => (
-              <li key={`${importError.fileName}-${importError.message}`}>
-                {importError.fileName} : {importError.message}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <div className="editor-layout">
-          <PhotoList
-            photos={photos}
-            activePhotoId={activePhotoId}
-            sheetCapacity={sheetCapacity}
-            fileNamesByPhotoId={fileNamesByPhotoId}
-            onSelectPhoto={setActivePhotoId}
-            onDisplayNameChange={handleDisplayNameChange}
-            onFirstNameChange={handleFirstNameChange}
-            onLastNameChange={handleLastNameChange}
-            onUsageChange={handleUsageChange}
-            onGenerateDisplayName={handleGenerateDisplayName}
-            onCopiesChange={handleCopiesChange}
-            onRemovePhoto={handleRemovePhoto}
-          />
-
-          <div className="photo-workflow">
-            <PhotoEditor
-              photo={activePhoto}
-              photoCanvasRef={photoCanvasRef}
-              guideCanvasRef={guideCanvasRef}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerEnd={handlePointerEnd}
-              onTransformChange={handleTransformChange}
-              onGuideVisibilityChange={handleGuideVisibilityChange}
-              onGuideOpacityChange={handleGuideOpacityChange}
-              onResetPhoto={handleResetActivePhoto}
-              onExportPhoto={handleExportPhoto}
-              faceModelStatus={faceModelStatus}
-              faceModelError={faceModelError}
-              onLoadFaceModel={handleLoadFaceModel}
-              onDetectFace={handleDetectFace}
-              onManualAssistantChange={handleManualAssistantChange}
-              onApplyManualFacePlacement={handleApplyManualFacePlacement}
-              onResetManualFacePoints={handleResetManualFacePoints}
-            />
-            <FinalPhotoPreview photo={activePhoto} />
-          </div>
-
-          <ExportPanel
-            photoCount={photos.length}
-            fileNamingTemplate={fileNamingTemplate}
-            sheetMode={sheetMode}
-            composition={sheetComposition}
-            onFileNamingTemplateChange={setFileNamingTemplate}
-            onSheetModeChange={setSheetMode}
-            onSheetExport={handleSheetExport}
-            onPrintSheet={handlePrintSheet}
-            onZipExport={handleZipExport}
-            onSeparateExport={handleBatchExport}
-          />
-        </div>
-
-        <SheetPreview
-          canvasRef={sheetCanvasRef}
+        <Workspace
+          mode={appMode}
+          photo={activePhoto}
+          photoCanvasRef={photoCanvasRef}
+          guideCanvasRef={guideCanvasRef}
+          sheetCanvasRef={sheetCanvasRef}
           sheetMode={sheetMode}
           composition={sheetComposition}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerEnd={handlePointerEnd}
         />
-      </section>
-    </main>
+
+        <RightInspector
+          mode={appMode}
+          photo={activePhoto}
+          photoCount={photos.length}
+          fileNamingTemplate={fileNamingTemplate}
+          sheetMode={sheetMode}
+          composition={sheetComposition}
+          faceModelStatus={faceModelStatus}
+          faceModelError={faceModelError}
+          backgroundSegmenterStatus={backgroundSegmenterStatus}
+          backgroundSegmenterError={backgroundSegmenterError}
+          backgroundPointMode={backgroundPointMode}
+          onGuideVisibilityChange={handleGuideVisibilityChange}
+          onGuideOpacityChange={handleGuideOpacityChange}
+          onLoadFaceModel={handleLoadFaceModel}
+          onPlaceFacePointsAutomatically={handlePlaceFacePointsAutomatically}
+          onManualPlacementChange={handleFaceManualPlacementChange}
+          onMoveFacePointChange={handleFacePointMoveChange}
+          onFacePointsVisibilityChange={handleFacePointsVisibilityChange}
+          onApplyFacePlacementFromPoints={handleApplyFacePlacementFromPoints}
+          onDeleteFacePoints={handleDeleteFacePoints}
+          onLoadBackgroundSegmenter={handleLoadBackgroundSegmenter}
+          onSegmentBackground={handleSegmentBackground}
+          onBackgroundChange={handleBackgroundChange}
+          onBackgroundPointModeChange={setBackgroundPointMode}
+          onResetBackgroundPoints={handleResetBackgroundPoints}
+          onFileNamingTemplateChange={setFileNamingTemplate}
+          onSheetModeChange={setSheetMode}
+          onExportPhoto={handleExportPhoto}
+          onSheetExport={handleSheetExport}
+          onPrintSheet={handlePrintSheet}
+          onZipExport={handleZipExport}
+          onSeparateExport={handleBatchExport}
+        />
+      </div>
+
+      <BottomToolbar
+        mode={appMode}
+        photo={activePhoto}
+        composition={sheetComposition}
+        onTransformChange={handleTransformChange}
+        onResetPhoto={handleResetActivePhoto}
+      />
+    </div>
   );
 }
 
@@ -833,10 +1172,21 @@ function getPhotoImageSize(photo: PhotoItem): Size {
   };
 }
 
-function getManualGuideOverlayPoints(photo: PhotoItem): GuideOverlayPoint[] {
+function getGuideOverlayPoints(photo: PhotoItem): GuideOverlayPoint[] {
+  return [
+    ...getManualFaceGuideOverlayPoints(photo),
+    ...getBackgroundGuideOverlayPoints(photo),
+  ];
+}
+
+function getManualFaceGuideOverlayPoints(photo: PhotoItem): GuideOverlayPoint[] {
   const faceDetection = photo.faceDetection;
 
-  if (!faceDetection || faceDetection.manualPoints.length === 0) {
+  if (
+    !faceDetection ||
+    !faceDetection.showFacePoints ||
+    faceDetection.manualPoints.length === 0
+  ) {
     return [];
   }
 
@@ -857,6 +1207,46 @@ function getManualGuideOverlayPoints(photo: PhotoItem): GuideOverlayPoint[] {
       label: getManualFacePointLabel(point.kind),
     };
   });
+}
+
+function getBackgroundGuideOverlayPoints(photo: PhotoItem): GuideOverlayPoint[] {
+  const backgroundEdit = photo.backgroundEdit;
+
+  if (!backgroundEdit) {
+    return [];
+  }
+
+  const imageSize = getPhotoImageSize(photo);
+  const foregroundPoints = backgroundEdit.manualForegroundPoints.map((point) =>
+    buildBackgroundOverlayPoint(photo, imageSize, point, "Personne", "#15803d"),
+  );
+  const backgroundPoints = backgroundEdit.manualBackgroundPoints.map((point) =>
+    buildBackgroundOverlayPoint(photo, imageSize, point, "Fond", "#b91c1c"),
+  );
+
+  return [...foregroundPoints, ...backgroundPoints];
+}
+
+function buildBackgroundOverlayPoint(
+  photo: PhotoItem,
+  imageSize: Size,
+  point: { x: number; y: number },
+  label: string,
+  color: string,
+): GuideOverlayPoint {
+  const canvasPoint = sourceImagePointToCanvasPoint(
+    point,
+    imageSize,
+    PHOTO_CANVAS_SIZE,
+    photo.editState.transform,
+  );
+
+  return {
+    xPx: canvasPoint.x,
+    yPx: canvasPoint.y,
+    label,
+    color,
+  };
 }
 
 function dedupeDiagnostics<TDiagnostic extends { code: string; message: string }>(

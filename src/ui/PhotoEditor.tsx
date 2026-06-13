@@ -2,7 +2,9 @@ import { PointerEventHandler, RefObject } from "react";
 import { ImageTransform, ZOOM_MAX, ZOOM_MIN } from "../core/geometry";
 import { PHOTO_FORMAT } from "../core/photo-format";
 import { PhotoItem } from "../core/photo-project";
+import { BackgroundSegmenterStatus } from "../vision/background-segmenter";
 import { FaceLandmarkerModelStatus } from "../vision/face-landmarker";
+import { BackgroundPanel, BackgroundPointMode } from "./BackgroundPanel";
 import { FaceDetectionPanel } from "./FaceDetectionPanel";
 
 type PhotoEditorProps = {
@@ -20,10 +22,20 @@ type PhotoEditorProps = {
   faceModelStatus: FaceLandmarkerModelStatus;
   faceModelError: string;
   onLoadFaceModel: () => void;
-  onDetectFace: () => void;
-  onManualAssistantChange: (enabled: boolean) => void;
-  onApplyManualFacePlacement: () => void;
-  onResetManualFacePoints: () => void;
+  onPlaceFacePointsAutomatically: () => void;
+  onManualPlacementChange: (enabled: boolean) => void;
+  onMoveFacePointChange: (enabled: boolean) => void;
+  onFacePointsVisibilityChange: (showFacePoints: boolean) => void;
+  onApplyFacePlacementFromPoints: () => void;
+  onDeleteFacePoints: () => void;
+  backgroundSegmenterStatus: BackgroundSegmenterStatus;
+  backgroundSegmenterError: string;
+  backgroundPointMode: BackgroundPointMode;
+  onLoadBackgroundSegmenter: () => void;
+  onSegmentBackground: () => void;
+  onBackgroundChange: (partialEdit: Partial<NonNullable<PhotoItem["backgroundEdit"]>>) => void;
+  onBackgroundPointModeChange: (mode: BackgroundPointMode) => void;
+  onResetBackgroundPoints: () => void;
 };
 
 export function PhotoEditor({
@@ -41,10 +53,20 @@ export function PhotoEditor({
   faceModelStatus,
   faceModelError,
   onLoadFaceModel,
-  onDetectFace,
-  onManualAssistantChange,
-  onApplyManualFacePlacement,
-  onResetManualFacePoints,
+  onPlaceFacePointsAutomatically,
+  onManualPlacementChange,
+  onMoveFacePointChange,
+  onFacePointsVisibilityChange,
+  onApplyFacePlacementFromPoints,
+  onDeleteFacePoints,
+  backgroundSegmenterStatus,
+  backgroundSegmenterError,
+  backgroundPointMode,
+  onLoadBackgroundSegmenter,
+  onSegmentBackground,
+  onBackgroundChange,
+  onBackgroundPointModeChange,
+  onResetBackgroundPoints,
 }: PhotoEditorProps) {
   const editState = photo?.editState;
   const transform = editState?.transform;
@@ -136,10 +158,25 @@ export function PhotoEditor({
           modelStatus={faceModelStatus}
           modelError={faceModelError}
           onLoadModel={onLoadFaceModel}
-          onDetectFace={onDetectFace}
-          onManualAssistantChange={onManualAssistantChange}
-          onApplyManualFacePlacement={onApplyManualFacePlacement}
-          onResetManualFacePoints={onResetManualFacePoints}
+          onPlaceFacePointsAutomatically={onPlaceFacePointsAutomatically}
+          onManualPlacementChange={onManualPlacementChange}
+          onMoveFacePointChange={onMoveFacePointChange}
+          onFacePointsVisibilityChange={onFacePointsVisibilityChange}
+          onApplyFacePlacementFromPoints={onApplyFacePlacementFromPoints}
+          onDeleteFacePoints={onDeleteFacePoints}
+        />
+
+        <BackgroundPanel
+          backgroundEdit={photo?.backgroundEdit}
+          disabled={!photo}
+          segmenterStatus={backgroundSegmenterStatus}
+          segmenterError={backgroundSegmenterError}
+          pointMode={backgroundPointMode}
+          onLoadSegmenter={onLoadBackgroundSegmenter}
+          onSegmentBackground={onSegmentBackground}
+          onBackgroundChange={onBackgroundChange}
+          onPointModeChange={onBackgroundPointModeChange}
+          onResetPoints={onResetBackgroundPoints}
         />
 
         <label className="slider-control">

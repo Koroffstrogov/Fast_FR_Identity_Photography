@@ -1,10 +1,15 @@
 import { PHOTO_FORMAT } from "../core/photo-format";
+import { BackgroundEditState } from "../core/photo-project";
 import {
   ImageTransform,
   Size,
   degreesToRadians,
   getCoverScale,
 } from "../core/geometry";
+import {
+  BackgroundRenderOutput,
+  applyBackgroundToCanvas,
+} from "./apply-background";
 
 export const PHOTO_CANVAS_SIZE: Size = {
   width: PHOTO_FORMAT.widthPx,
@@ -24,6 +29,8 @@ export function renderPhotoToCanvas(
   canvas: HTMLCanvasElement,
   image: HTMLImageElement,
   transform: ImageTransform,
+  backgroundEdit?: BackgroundEditState,
+  output: BackgroundRenderOutput = "preview",
 ): void {
   canvas.width = PHOTO_FORMAT.widthPx;
   canvas.height = PHOTO_FORMAT.heightPx;
@@ -49,6 +56,8 @@ export function renderPhotoToCanvas(
   context.scale(scale, scale);
   context.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2);
   context.restore();
+
+  applyBackgroundToCanvas(canvas, imageSize, transform, backgroundEdit, output);
 }
 
 function getCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {

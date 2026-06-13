@@ -1,15 +1,17 @@
 import { FaceLandmarkerModelStatus } from "../vision/face-landmarker";
-import { PhotoItem } from "../core/photo-project";
+import { PhotoItem, hasAllFacePoints } from "../core/photo-project";
 
 type FaceDetectionPanelProps = {
   photo: PhotoItem | null;
   modelStatus: FaceLandmarkerModelStatus;
   modelError: string;
   onLoadModel: () => void;
-  onDetectFace: () => void;
-  onManualAssistantChange: (enabled: boolean) => void;
-  onApplyManualFacePlacement: () => void;
-  onResetManualFacePoints: () => void;
+  onPlaceFacePointsAutomatically: () => void;
+  onManualPlacementChange: (enabled: boolean) => void;
+  onMoveFacePointChange: (enabled: boolean) => void;
+  onFacePointsVisibilityChange: (showFacePoints: boolean) => void;
+  onApplyFacePlacementFromPoints: () => void;
+  onDeleteFacePoints: () => void;
 };
 
 export function FaceDetectionPanel({
@@ -17,22 +19,28 @@ export function FaceDetectionPanel({
   modelStatus,
   modelError,
   onLoadModel,
-  onDetectFace,
-  onManualAssistantChange,
-  onApplyManualFacePlacement,
-  onResetManualFacePoints,
+  onPlaceFacePointsAutomatically,
+  onManualPlacementChange,
+  onMoveFacePointChange,
+  onFacePointsVisibilityChange,
+  onApplyFacePlacementFromPoints,
+  onDeleteFacePoints,
 }: FaceDetectionPanelProps) {
   const detectionState = photo?.faceDetection;
-  const manualAssistantEnabled = detectionState?.manualAssistantEnabled ?? false;
-  const manualPointCount = detectionState?.manualPoints.length ?? 0;
+  const displayedDiagnostics =
+    detectionState?.diagnostics.filter(
+      (diagnostic) =>
+        !(detectionState.status === "not-found" && diagnostic.code === "no-face"),
+    ) ?? [];
+  const showFacePoints = detectionState?.showFacePoints ?? true;
+  const pointEditMode = detectionState?.pointEditMode ?? "none";
+  const facePointCount = detectionState?.manualPoints.length ?? 0;
   const isBusy = modelStatus === "loading" || detectionState?.status === "detecting";
-  const hasManualRequiredPoints =
-    detectionState?.manualPoints.some((point) => point.kind === "eyesCenter") &&
-    detectionState.manualPoints.some((point) => point.kind === "chin");
+  const canFrameFromPoints = hasAllFacePoints(detectionState?.manualPoints ?? []);
 
   return (
     <fieldset className="face-detection-panel">
-      <legend>Detection visage locale</legend>
+      <legend>Points visage</legend>
 
       <p className="model-status">
         Modele : {getModelStatusLabel(modelStatus)}
@@ -49,8 +57,12 @@ export function FaceDetectionPanel({
         </button>
       )}
 
-      <button type="button" onClick={onDetectFace} disabled={!photo || isBusy}>
-        Detecter le visage
+      <button
+        type="button"
+        onClick={onPlaceFacePointsAutomatically}
+        disabled={!photo || isBusy}
+      >
+        Placer les points automatiquement
       </button>
 
       {modelError && <p className="warning">{modelError}</p>}
@@ -58,9 +70,9 @@ export function FaceDetectionPanel({
         <p className="detection-message">{detectionState.message}</p>
       )}
 
-      {detectionState?.diagnostics && detectionState.diagnostics.length > 0 && (
+      {displayedDiagnostics.length > 0 && (
         <ul className="diagnostic-list" aria-label="Diagnostics visage">
-          {detectionState.diagnostics.map((diagnostic) => (
+          {displayedDiagnostics.map((diagnostic) => (
             <li key={`${diagnostic.code}-${diagnostic.message}`}>
               {diagnostic.message}
             </li>
@@ -71,33 +83,52 @@ export function FaceDetectionPanel({
       <label className="check-control">
         <input
           type="checkbox"
-          checked={manualAssistantEnabled}
-          onChange={(event) => onManualAssistantChange(event.currentTarget.checked)}
+          checked={showFacePoints}
+          onChange={(event) => onFacePointsVisibilityChange(event.currentTarget.checked)}
           disabled={!photo}
         />
-        <span>Assistant manuel visage</span>
+        <span>Afficher les points du visage</span>
       </label>
 
       <p className="manual-note">
-        Points manuels : {manualPointCount}/3. Cliquez centre des yeux, menton,
-        puis sommet du crane si utile.
+        Points visage : {facePointCount}/3. Ordre manuel : yeux, menton,
+        sommet du crane.
       </p>
 
       <div className="button-row">
         <button
           type="button"
-          className="secondary-button"
-          onClick={onResetManualFacePoints}
-          disabled={!photo || manualPointCount === 0}
+          className={pointEditMode === "place" ? "active-tool-button" : "secondary-button"}
+          onClick={() => onManualPlacementChange(pointEditMode !== "place")}
+          disabled={!photo}
         >
-          Reinitialiser les points
+          Placer les points du visage manuellement
         </button>
         <button
           type="button"
-          onClick={onApplyManualFacePlacement}
-          disabled={!photo || !hasManualRequiredPoints}
+          className={pointEditMode === "move" ? "active-tool-button" : "secondary-button"}
+          onClick={() => onMoveFacePointChange(pointEditMode !== "move")}
+          disabled={!photo || facePointCount === 0}
         >
-          Appliquer le cadrage manuel
+          Deplacer un point
+        </button>
+      </div>
+
+      <div className="button-row">
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={onDeleteFacePoints}
+          disabled={!photo || facePointCount === 0}
+        >
+          Supprimer les points
+        </button>
+        <button
+          type="button"
+          onClick={onApplyFacePlacementFromPoints}
+          disabled={!photo || !canFrameFromPoints}
+        >
+          Cadrer a partir de points
         </button>
       </div>
     </fieldset>

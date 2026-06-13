@@ -13,6 +13,7 @@ export const FACE_LANDMARKER_WASM_PATH = "/models/mediapipe/wasm";
 const MIN_MODEL_SIZE_BYTES = 1_000_000;
 const ZIP_MAGIC_FIRST_BYTE = 0x50;
 const ZIP_MAGIC_SECOND_BYTE = 0x4b;
+const ZIP_MAGIC_SCAN_BYTES = 16;
 
 let landmarker: FaceLandmarker | null = null;
 let loadingPromise: Promise<FaceLandmarker> | null = null;
@@ -81,6 +82,8 @@ async function createFaceLandmarker(): Promise<FaceLandmarker> {
     minFaceDetectionConfidence: 0.5,
     minFacePresenceConfidence: 0.5,
     minTrackingConfidence: 0.5,
+    outputFaceBlendshapes: false,
+    outputFacialTransformationMatrixes: false,
   });
 }
 
@@ -110,16 +113,28 @@ async function loadLocalFaceLandmarkerModel(): Promise<Uint8Array> {
     );
   }
 
-  if (
-    modelBuffer[0] !== ZIP_MAGIC_FIRST_BYTE ||
-    modelBuffer[1] !== ZIP_MAGIC_SECOND_BYTE
-  ) {
+  if (!hasZipMagicNearStart(modelBuffer)) {
     throw new Error(
       `Le fichier modele ${FACE_LANDMARKER_MODEL_PATH} n'a pas le format MediaPipe attendu.`,
     );
   }
 
   return modelBuffer;
+}
+
+function hasZipMagicNearStart(buffer: Uint8Array): boolean {
+  const scanLength = Math.min(buffer.byteLength - 1, ZIP_MAGIC_SCAN_BYTES);
+
+  for (let index = 0; index < scanLength; index += 1) {
+    if (
+      buffer[index] === ZIP_MAGIC_FIRST_BYTE &&
+      buffer[index + 1] === ZIP_MAGIC_SECOND_BYTE
+    ) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function looksLikeHtml(buffer: Uint8Array): boolean {

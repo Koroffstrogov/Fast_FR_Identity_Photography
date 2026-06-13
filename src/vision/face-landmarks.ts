@@ -55,6 +55,7 @@ const LEFT_EYE_INDICES = [33, 133, 159, 145];
 const RIGHT_EYE_INDICES = [263, 362, 386, 374];
 const CHIN_INDEX = 152;
 const FOREHEAD_TOP_INDEX = 10;
+const SKULL_TOP_EXTENSION_FROM_FOREHEAD_RATIO = 0.22;
 const TILT_WARNING_DEGREES = 12;
 const MIN_FACE_BOUND_RATIO = 0.18;
 const MIN_FACE_AREA_RATIO = 0.03;
@@ -123,13 +124,12 @@ export function extractFaceCandidate(
   const rollDegrees = calculateEyeAngleDegrees(leftEye, rightEye);
   const eyesCenter = averagePoints(leftEye, rightEye);
   const topLandmark = landmarks[FOREHEAD_TOP_INDEX];
-  const estimatedSkullTop = isFiniteLandmark(topLandmark)
-    ? topLandmark
-    : {
-        x: eyesCenter.x,
-        y: bounds.minY,
-        z: eyesCenter.z,
-      };
+  const estimatedSkullTop = estimateSkullTop({
+    foreheadTop: isFiniteLandmark(topLandmark) ? topLandmark : null,
+    eyesCenter,
+    chin,
+    bounds,
+  });
   const diagnostics = getCandidateDiagnostics({
     leftEye,
     rightEye,
@@ -199,6 +199,37 @@ export function analyzeFaceLandmarks(
     diagnostics: selectedFace
       ? [...diagnostics, ...selectedFace.diagnostics]
       : diagnostics,
+  };
+}
+
+function estimateSkullTop({
+  foreheadTop,
+  eyesCenter,
+  chin,
+  bounds,
+}: {
+  foreheadTop: NormalizedFaceLandmark | null;
+  eyesCenter: NormalizedFaceLandmark;
+  chin: NormalizedFaceLandmark;
+  bounds: FaceBounds;
+}): NormalizedFaceLandmark {
+  const referenceTop = foreheadTop ?? {
+    x: eyesCenter.x,
+    y: bounds.minY,
+    z: eyesCenter.z,
+    visibility: eyesCenter.visibility,
+  };
+  const faceHeightFromForehead = Math.max(0, chin.y - referenceTop.y);
+  const fallbackFaceHeight = Math.max(bounds.height, chin.y - eyesCenter.y);
+  const extrapolationBase =
+    faceHeightFromForehead > 0 ? faceHeightFromForehead : fallbackFaceHeight;
+  const skullExtension = extrapolationBase * SKULL_TOP_EXTENSION_FROM_FOREHEAD_RATIO;
+
+  return {
+    x: referenceTop.x,
+    y: Math.max(0, Math.min(eyesCenter.y, referenceTop.y - skullExtension)),
+    z: referenceTop.z,
+    visibility: referenceTop.visibility,
   };
 }
 

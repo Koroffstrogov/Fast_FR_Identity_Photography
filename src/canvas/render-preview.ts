@@ -23,7 +23,13 @@ export function renderFinalPhotoPreviewToCanvas(
   canvas: HTMLCanvasElement,
   photo: PhotoItem,
 ): void {
-  renderPhotoToCanvas(canvas, photo.image, photo.editState.transform);
+  renderPhotoToCanvas(
+    canvas,
+    photo.image,
+    photo.editState.transform,
+    photo.backgroundEdit,
+    "preview",
+  );
 }
 
 function getCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {

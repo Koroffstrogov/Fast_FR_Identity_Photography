@@ -23,7 +23,7 @@ describe("face landmarks helpers", () => {
     expect(candidate).not.toBeNull();
     expect(candidate?.eyesCenter.x).toBeCloseTo(0.5);
     expect(candidate?.chin.y).toBeCloseTo(0.78);
-    expect(candidate?.estimatedSkullTop.y).toBeCloseTo(0.2);
+    expect(candidate?.estimatedSkullTop.y).toBeCloseTo(0.0724);
   });
 
   it("selects the largest face among simulated results", () => {

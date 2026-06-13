@@ -16,6 +16,7 @@ type SheetPreviewProps = {
   canvasRef: RefObject<HTMLCanvasElement | null>;
   sheetMode: PrintLayoutMode;
   composition: SheetComposition;
+  variant?: "section" | "stage";
 };
 
 const SHEET_ZOOM_LABELS: Record<SheetPreviewZoom, string> = {
@@ -25,7 +26,12 @@ const SHEET_ZOOM_LABELS: Record<SheetPreviewZoom, string> = {
   "200": "200%",
 };
 
-export function SheetPreview({ canvasRef, sheetMode, composition }: SheetPreviewProps) {
+export function SheetPreview({
+  canvasRef,
+  sheetMode,
+  composition,
+  variant = "section",
+}: SheetPreviewProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const dragStateRef = useRef<DragState | null>(null);
   const [zoom, setZoom] = useState<SheetPreviewZoom>("fit");
@@ -64,6 +70,64 @@ export function SheetPreview({ canvasRef, sheetMode, composition }: SheetPreview
     }
   }
 
+  const sheetPreview = (
+    <div className="sheet-preview-panel">
+      <fieldset className="zoom-control">
+        <legend>Zoom aperçu</legend>
+        <div className="segmented-options zoom-options">
+          {(Object.keys(SHEET_ZOOM_LABELS) as SheetPreviewZoom[]).map((zoomOption) => (
+            <label key={zoomOption}>
+              <input
+                type="radio"
+                name="sheet-preview-zoom"
+                value={zoomOption}
+                checked={zoom === zoomOption}
+                onChange={() => setZoom(zoomOption)}
+              />
+              <span>{SHEET_ZOOM_LABELS[zoomOption]}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <div
+        ref={viewportRef}
+        className={canPan ? "sheet-preview-viewport can-pan" : "sheet-preview-viewport"}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+      >
+        <canvas
+          ref={canvasRef}
+          width="2480"
+          height="3508"
+          className={`sheet-canvas sheet-zoom-${zoom}`}
+          aria-label="Apercu planche A4 imprimable"
+        />
+      </div>
+    </div>
+  );
+
+  if (variant === "stage") {
+    return (
+      <section className="sheet-stage-section" aria-labelledby="sheet-title">
+        <div className="stage-title-row">
+          <div>
+            <p className="eyebrow">Planche imprimable</p>
+            <h2 id="sheet-title">Apercu planche A4</h2>
+          </div>
+          <dl className="sheet-stage-stats">
+            <div>
+              <dt>Placees</dt>
+              <dd>{composition.renderedCount}/{composition.capacity}</dd>
+            </div>
+          </dl>
+        </div>
+        {sheetPreview}
+      </section>
+    );
+  }
+
   return (
     <section className="sheet-section" aria-labelledby="sheet-title">
       <div className="sheet-copy">
@@ -95,41 +159,7 @@ export function SheetPreview({ canvasRef, sheetMode, composition }: SheetPreview
         )}
       </div>
 
-      <div className="sheet-preview-panel">
-        <fieldset className="zoom-control">
-          <legend>Zoom aperçu</legend>
-          <div className="segmented-options zoom-options">
-            {(Object.keys(SHEET_ZOOM_LABELS) as SheetPreviewZoom[]).map((zoomOption) => (
-              <label key={zoomOption}>
-                <input
-                  type="radio"
-                  name="sheet-preview-zoom"
-                  value={zoomOption}
-                  checked={zoom === zoomOption}
-                  onChange={() => setZoom(zoomOption)}
-                />
-                <span>{SHEET_ZOOM_LABELS[zoomOption]}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        <div
-          ref={viewportRef}
-          className={canPan ? "sheet-preview-viewport can-pan" : "sheet-preview-viewport"}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerEnd}
-          onPointerCancel={handlePointerEnd}
-        >
-          <canvas
-            ref={canvasRef}
-            width="2480"
-            height="3508"
-            className={`sheet-canvas sheet-zoom-${zoom}`}
-            aria-label="Apercu planche A4 imprimable"
-          />
-        </div>
-      </div>
+      {sheetPreview}
     </section>
   );
 }

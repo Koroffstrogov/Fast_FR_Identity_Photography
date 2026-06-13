@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  addBackgroundPoint,
+  getDefaultBackgroundEditState,
   getNextManualFacePointKind,
+  hasAllFacePoints,
+  resetBackgroundPoints,
   upsertManualFacePoint,
 } from "./photo-project";
 
@@ -31,5 +35,54 @@ describe("photo project manual face points", () => {
       { kind: "eyesCenter", xPx: 5, yPx: 8 },
       { kind: "chin", xPx: 30, yPx: 40 },
     ]);
+  });
+
+  it("requires eyes, chin and skull top for complete face points", () => {
+    expect(
+      hasAllFacePoints([
+        { kind: "eyesCenter", xPx: 5, yPx: 8 },
+        { kind: "chin", xPx: 30, yPx: 40 },
+      ]),
+    ).toBe(false);
+    expect(
+      hasAllFacePoints([
+        { kind: "eyesCenter", xPx: 5, yPx: 8 },
+        { kind: "chin", xPx: 30, yPx: 40 },
+        { kind: "skullTop", xPx: 20, yPx: 10 },
+      ]),
+    ).toBe(true);
+  });
+});
+
+describe("photo project background points", () => {
+  it("stores foreground and background points independently", () => {
+    const backgroundEdit = getDefaultBackgroundEditState();
+    const withForegroundPoint = addBackgroundPoint(
+      backgroundEdit,
+      "foreground",
+      { x: 10, y: 20 },
+    );
+    const withBackgroundPoint = addBackgroundPoint(
+      withForegroundPoint,
+      "background",
+      { x: 30, y: 40 },
+    );
+
+    expect(withBackgroundPoint.manualForegroundPoints).toEqual([{ x: 10, y: 20 }]);
+    expect(withBackgroundPoint.manualBackgroundPoints).toEqual([{ x: 30, y: 40 }]);
+    expect(withBackgroundPoint.maskVersion).toBe(2);
+  });
+
+  it("resets correction points and increments mask version", () => {
+    const backgroundEdit = addBackgroundPoint(
+      getDefaultBackgroundEditState(),
+      "foreground",
+      { x: 10, y: 20 },
+    );
+    const resetEdit = resetBackgroundPoints(backgroundEdit);
+
+    expect(resetEdit.manualForegroundPoints).toEqual([]);
+    expect(resetEdit.manualBackgroundPoints).toEqual([]);
+    expect(resetEdit.maskVersion).toBe(2);
   });
 });

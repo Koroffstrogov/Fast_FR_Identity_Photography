@@ -5,6 +5,7 @@ export type GuideOverlayPoint = {
   xPx: number;
   yPx: number;
   label: string;
+  color?: string;
 };
 
 export type FaceGuideOverlayOptions = {
@@ -124,7 +125,7 @@ function drawManualPoints(
   manualPoints.forEach((point) => {
     context.beginPath();
     context.arc(point.xPx, point.yPx, 7, 0, Math.PI * 2);
-    context.fillStyle = "rgb(22 78 99 / 90%)";
+    context.fillStyle = point.color ?? "rgb(22 78 99 / 90%)";
     context.fill();
     context.lineWidth = 2;
     context.strokeStyle = "#ffffff";

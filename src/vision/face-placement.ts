@@ -58,6 +58,18 @@ export function createFacePlacementFromManualPoints(
   manualPoints: readonly PhotoManualFacePoint[],
   imageSize: Size,
 ): FacePlacementResult {
+  return createFacePlacementFromFacePoints(
+    manualPoints,
+    imageSize,
+    "Cadrage manuel applique. Verifiez le guide avant export.",
+  );
+}
+
+export function createFacePlacementFromFacePoints(
+  manualPoints: readonly PhotoManualFacePoint[],
+  imageSize: Size,
+  message = "Cadrage applique a partir des points visage. Verifiez le guide avant export.",
+): FacePlacementResult {
   const eyesCenter = getManualPoint(manualPoints, "eyesCenter");
   const chin = getManualPoint(manualPoints, "chin");
   const skullTop = getManualPoint(manualPoints, "skullTop");
@@ -84,7 +96,7 @@ export function createFacePlacementFromManualPoints(
     },
     imageSize,
     [],
-    "Cadrage manuel applique. Verifiez le guide avant export.",
+    message,
   );
 }
 
@@ -111,10 +123,13 @@ export function createFacePlacementFromSourcePoints(
     x: PHOTO_CANVAS_SIZE.width / 2,
     y: mmToCanvasYPx(guide.chinLine.yMm),
   };
+  const targetSkullTop = {
+    x: PHOTO_CANVAS_SIZE.width / 2,
+    y: mmToCanvasYPx(guide.skullTopTargetLine.yMm),
+  };
   const rotationDegrees = getPlacementRotationDegrees(points);
   const desiredDistancePx = points.skullTop
-    ? mmToCanvasYPx(guide.chinLine.yMm) -
-      mmToCanvasYPx(guide.skullTopTargetLine.yMm)
+    ? targetChin.y - targetSkullTop.y
     : mmToCanvasYPx(guide.chinLine.yMm) - mmToCanvasYPx(guide.eyeLine.yMm);
   const sourceDistancePx = points.skullTop
     ? getDistance(points.chin, points.skullTop)
@@ -139,13 +154,6 @@ export function createFacePlacementFromSourcePoints(
   const rawZoom = desiredDistancePx / sourceDistancePx / coverScale;
   const zoom = clampZoom(rawZoom);
   const scale = coverScale * zoom;
-  const eyeOffset = getOffsetForSourcePoint({
-    sourcePoint: points.eyesCenter,
-    targetPoint: targetEyes,
-    imageSize,
-    rotationDegrees,
-    scale,
-  });
   const chinOffset = getOffsetForSourcePoint({
     sourcePoint: points.chin,
     targetPoint: targetChin,
@@ -153,6 +161,21 @@ export function createFacePlacementFromSourcePoints(
     rotationDegrees,
     scale,
   });
+  const secondaryOffset = points.skullTop
+    ? getOffsetForSourcePoint({
+        sourcePoint: points.skullTop,
+        targetPoint: targetSkullTop,
+        imageSize,
+        rotationDegrees,
+        scale,
+      })
+    : getOffsetForSourcePoint({
+        sourcePoint: points.eyesCenter,
+        targetPoint: targetEyes,
+        imageSize,
+        rotationDegrees,
+        scale,
+      });
   const diagnostics = [...initialDiagnostics];
 
   if (zoom !== rawZoom) {
@@ -165,8 +188,8 @@ export function createFacePlacementFromSourcePoints(
 
   return {
     transform: {
-      offsetX: (eyeOffset.x + chinOffset.x) / 2,
-      offsetY: (eyeOffset.y + chinOffset.y) / 2,
+      offsetX: (secondaryOffset.x + chinOffset.x) / 2,
+      offsetY: (secondaryOffset.y + chinOffset.y) / 2,
       zoom,
       rotationDegrees,
     },
