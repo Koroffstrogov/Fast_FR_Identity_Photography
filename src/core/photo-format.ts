@@ -4,7 +4,7 @@ export const PHOTO_WIDTH_MM = 35;
 export const PHOTO_HEIGHT_MM = 45;
 export const JPEG_EXPORT_QUALITY = 0.92;
 
-export function millimetersToPixels(
+export function mmToPx(
   millimeters: number,
   dpi = PHOTO_DPI,
 ): number {
@@ -19,11 +19,18 @@ export function millimetersToPixels(
   return Math.round((millimeters / MM_PER_INCH) * dpi);
 }
 
+export function millimetersToPixels(
+  millimeters: number,
+  dpi = PHOTO_DPI,
+): number {
+  return mmToPx(millimeters, dpi);
+}
+
 export const PHOTO_FORMAT = {
   widthMm: PHOTO_WIDTH_MM,
   heightMm: PHOTO_HEIGHT_MM,
   dpi: PHOTO_DPI,
-  widthPx: millimetersToPixels(PHOTO_WIDTH_MM),
-  heightPx: millimetersToPixels(PHOTO_HEIGHT_MM),
+  widthPx: mmToPx(PHOTO_WIDTH_MM),
+  heightPx: mmToPx(PHOTO_HEIGHT_MM),
   mimeType: "image/jpeg",
 } as const;

@@ -15,6 +15,9 @@ export type ImageTransform = {
   rotationDegrees: number;
 };
 
+export const ZOOM_MIN = 0.5;
+export const ZOOM_MAX = 3;
+
 export const DEFAULT_IMAGE_TRANSFORM: ImageTransform = {
   offsetX: 0,
   offsetY: 0,
@@ -54,6 +57,39 @@ export function getRenderedImageSize(
   };
 }
 
+export function clampZoom(zoom: number): number {
+  if (!Number.isFinite(zoom)) {
+    throw new Error("zoom must be a finite number");
+  }
+
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
+}
+
+export function zoomTransformAtPoint(
+  transform: ImageTransform,
+  target: Size,
+  canvasPoint: Point,
+  nextZoom: number,
+): ImageTransform {
+  assertPositiveSize(target, "target");
+  assertFinitePoint(canvasPoint, "canvasPoint");
+  assertPositiveZoom(transform.zoom);
+
+  const clampedZoom = clampZoom(nextZoom);
+  const zoomRatio = clampedZoom / transform.zoom;
+  const centerX = target.width / 2;
+  const centerY = target.height / 2;
+  const anchorFromCenterX = canvasPoint.x - centerX;
+  const anchorFromCenterY = canvasPoint.y - centerY;
+
+  return {
+    ...transform,
+    zoom: clampedZoom,
+    offsetX: anchorFromCenterX - zoomRatio * (anchorFromCenterX - transform.offsetX),
+    offsetY: anchorFromCenterY - zoomRatio * (anchorFromCenterY - transform.offsetY),
+  };
+}
+
 export function scalePointerDeltaToCanvas(
   delta: Point,
   displayedCanvas: Size,
@@ -68,6 +104,21 @@ export function scalePointerDeltaToCanvas(
   };
 }
 
+export function getCanvasPointFromClientPoint(
+  clientPoint: Point,
+  canvasRect: Size & Point,
+  backingCanvas: Size,
+): Point {
+  assertFinitePoint(clientPoint, "clientPoint");
+  assertPositiveSize(canvasRect, "canvasRect");
+  assertPositiveSize(backingCanvas, "backingCanvas");
+
+  return {
+    x: (clientPoint.x - canvasRect.x) * (backingCanvas.width / canvasRect.width),
+    y: (clientPoint.y - canvasRect.y) * (backingCanvas.height / canvasRect.height),
+  };
+}
+
 function assertPositiveSize(size: Size, label: string): void {
   if (
     !Number.isFinite(size.width) ||
@@ -76,6 +127,12 @@ function assertPositiveSize(size: Size, label: string): void {
     size.height <= 0
   ) {
     throw new Error(`${label} size must contain positive finite dimensions`);
+  }
+}
+
+function assertFinitePoint(point: Point, label: string): void {
+  if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+    throw new Error(`${label} must contain finite coordinates`);
   }
 }
 

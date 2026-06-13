@@ -4,6 +4,7 @@ import {
   PHOTO_FORMAT,
   PHOTO_HEIGHT_MM,
   PHOTO_WIDTH_MM,
+  mmToPx,
   millimetersToPixels,
 } from "./photo-format";
 
@@ -21,12 +22,13 @@ describe("photo format constants", () => {
   });
 
   it("converts millimeters to pixels at the supplied dpi", () => {
-    expect(millimetersToPixels(25.4, 300)).toBe(300);
-    expect(millimetersToPixels(10, 300)).toBe(118);
+    expect(mmToPx(25.4, 300)).toBe(300);
+    expect(mmToPx(10, 300)).toBe(118);
+    expect(millimetersToPixels(10, 300)).toBe(mmToPx(10, 300));
   });
 
   it("rejects invalid dimensions", () => {
-    expect(() => millimetersToPixels(0)).toThrow();
-    expect(() => millimetersToPixels(10, Number.NaN)).toThrow();
+    expect(() => mmToPx(0)).toThrow();
+    expect(() => mmToPx(10, Number.NaN)).toThrow();
   });
 });
