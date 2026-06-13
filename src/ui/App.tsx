@@ -13,9 +13,17 @@ import {
   zoomTransformAtPoint,
 } from "../core/geometry";
 import {
+  FILE_NAMING_TEMPLATES,
+  FileNamingTemplateId,
+  buildDisplayNameFromPersonName,
+  buildSheetFileName,
+  buildUniquePhotoFileNames,
+  buildZipFileName,
+} from "../core/file-naming";
+import {
   PhotoItem,
+  PhotoUsage,
   clampCopies,
-  createPhotoItem,
   getNextActivePhotoId,
   removePhotoItem,
   updatePhotoItem,
@@ -27,7 +35,16 @@ import {
   getSheetCapacity,
 } from "../core/print-layout";
 import { buildSheetComposition } from "../core/sheet-items";
-import { loadImageFile } from "../io/load-image-file";
+import {
+  ImageImportError,
+  formatImportSummary,
+  importImageFiles,
+} from "../io/import-images";
+import {
+  downloadPhotoExports,
+  exportIndividualPhotoBlobs,
+} from "../export/export-batch";
+import { createPhotosZip, downloadZip } from "../export/export-zip";
 import { openA4PrintPage } from "../print/open-print-page";
 import { PhotoEditor } from "./PhotoEditor";
 import { PhotoList } from "./PhotoList";
@@ -48,7 +65,11 @@ export function App() {
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [importSummary, setImportSummary] = useState("");
+  const [importErrors, setImportErrors] = useState<ImageImportError[]>([]);
   const [sheetMode, setSheetMode] = useState<PrintLayoutMode>("standard");
+  const [fileNamingTemplate, setFileNamingTemplate] =
+    useState<FileNamingTemplateId>("displayNameIdentity");
   const sheetCapacity = useMemo(() => getSheetCapacity(sheetMode), [sheetMode]);
   const activePhoto = useMemo(
     () => photos.find((photo) => photo.id === activePhotoId) ?? null,
@@ -57,6 +78,10 @@ export function App() {
   const sheetComposition = useMemo(
     () => buildSheetComposition(photos, sheetMode),
     [photos, sheetMode],
+  );
+  const fileNamesByPhotoId = useMemo(
+    () => buildUniquePhotoFileNames(photos, fileNamingTemplate),
+    [fileNamingTemplate, photos],
   );
 
   useEffect(() => {
@@ -163,24 +188,26 @@ export function App() {
       return;
     }
 
-    try {
-      const loadedPhotos = await Promise.all(
-        files.map(async (file) =>
-          createPhotoItem({
-            id: createPhotoItemId(),
-            originalFileName: file.name,
-            image: await loadImageFile(file),
-          }),
-        ),
-      );
+    const result = await importImageFiles(files, createPhotoItemId);
+    const summary = formatImportSummary(result);
 
-      setPhotos((currentPhotos) => [...currentPhotos, ...loadedPhotos]);
+    if (result.photos.length > 0) {
+      setPhotos((currentPhotos) => [...currentPhotos, ...result.photos]);
       setActivePhotoId((currentActivePhotoId) =>
-        currentActivePhotoId ?? loadedPhotos[0]?.id ?? null,
+        currentActivePhotoId ?? result.photos[0]?.id ?? null,
       );
+    }
+
+    setImportSummary(summary);
+    setImportErrors(result.errors);
+
+    if (result.errors.length === files.length) {
+      setError("Aucune image valide n'a pu etre importee.");
+      return;
+    }
+
+    if (result.errors.length === 0) {
       setError("");
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Image illisible.");
     }
   }
 
@@ -304,6 +331,42 @@ export function App() {
     }));
   }
 
+  function handleFirstNameChange(photoId: string, firstName: string) {
+    updatePhoto(photoId, (photo) => ({
+      ...photo,
+      firstName,
+    }));
+  }
+
+  function handleLastNameChange(photoId: string, lastName: string) {
+    updatePhoto(photoId, (photo) => ({
+      ...photo,
+      lastName,
+    }));
+  }
+
+  function handleUsageChange(photoId: string, usage: PhotoUsage | "") {
+    updatePhoto(photoId, (photo) => ({
+      ...photo,
+      usage: usage || undefined,
+    }));
+  }
+
+  function handleGenerateDisplayName(photoId: string) {
+    updatePhoto(photoId, (photo) => {
+      const displayName = buildDisplayNameFromPersonName(photo);
+
+      if (!displayName) {
+        return photo;
+      }
+
+      return {
+        ...photo,
+        displayName,
+      };
+    });
+  }
+
   function handleCopiesChange(photoId: string, copies: number) {
     updatePhoto(photoId, (photo) => ({
       ...photo,
@@ -330,8 +393,45 @@ export function App() {
 
     const link = document.createElement("a");
     link.href = exportCanvasToJpeg(canvas);
-    link.download = "photo-identite-413x531.jpg";
+    link.download = fileNamesByPhotoId.get(activePhoto.id) ?? "photo_identite.jpg";
     link.click();
+  }
+
+  async function handleBatchExport() {
+    if (photos.length === 0) {
+      return;
+    }
+
+    try {
+      const exports = await exportIndividualPhotoBlobs(photos, fileNamingTemplate);
+      downloadPhotoExports(exports);
+      setError("");
+    } catch (exportError) {
+      setError(
+        exportError instanceof Error
+          ? exportError.message
+          : "Impossible d'exporter les photos.",
+      );
+    }
+  }
+
+  async function handleZipExport() {
+    if (photos.length === 0) {
+      return;
+    }
+
+    try {
+      const exports = await exportIndividualPhotoBlobs(photos, fileNamingTemplate);
+      const zipBlob = await createPhotosZip(exports);
+      downloadZip(zipBlob, buildZipFileName());
+      setError("");
+    } catch (exportError) {
+      setError(
+        exportError instanceof Error
+          ? exportError.message
+          : "Impossible de generer le ZIP.",
+      );
+    }
   }
 
   function handleSheetExport() {
@@ -343,7 +443,7 @@ export function App() {
 
     const link = document.createElement("a");
     link.href = exportSheetCanvasToJpeg(canvas);
-    link.download = `planche-a4-${sheetMode}-${sheetComposition.renderedCount}-photos.jpg`;
+    link.download = buildSheetFileName();
     link.click();
   }
 
@@ -384,14 +484,29 @@ export function App() {
         </label>
 
         {error && <p className="error" role="alert">{error}</p>}
+        {importSummary && <p className="import-summary">{importSummary}</p>}
+        {importErrors.length > 0 && (
+          <ul className="import-errors" aria-label="Fichiers ignores">
+            {importErrors.map((importError) => (
+              <li key={`${importError.fileName}-${importError.message}`}>
+                {importError.fileName} : {importError.message}
+              </li>
+            ))}
+          </ul>
+        )}
 
         <div className="editor-layout">
           <PhotoList
             photos={photos}
             activePhotoId={activePhotoId}
             sheetCapacity={sheetCapacity}
+            fileNamesByPhotoId={fileNamesByPhotoId}
             onSelectPhoto={setActivePhotoId}
             onDisplayNameChange={handleDisplayNameChange}
+            onFirstNameChange={handleFirstNameChange}
+            onLastNameChange={handleLastNameChange}
+            onUsageChange={handleUsageChange}
+            onGenerateDisplayName={handleGenerateDisplayName}
             onCopiesChange={handleCopiesChange}
             onRemovePhoto={handleRemovePhoto}
           />
@@ -411,6 +526,26 @@ export function App() {
           />
 
           <form className="controls sheet-controls" onSubmit={(event) => event.preventDefault()}>
+            <fieldset className="mode-control">
+              <legend>Nommage exports</legend>
+              <label className="select-control">
+                <span>Modele</span>
+                <select
+                  aria-label="Modele de nommage"
+                  value={fileNamingTemplate}
+                  onChange={(event) =>
+                    setFileNamingTemplate(event.currentTarget.value as FileNamingTemplateId)
+                  }
+                >
+                  {Object.entries(FILE_NAMING_TEMPLATES).map(([templateId, template]) => (
+                    <option key={templateId} value={templateId}>
+                      {template.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </fieldset>
+
             <fieldset className="mode-control">
               <legend>Planche A4</legend>
               <div className="segmented-options">
@@ -462,6 +597,23 @@ export function App() {
                 disabled={photos.length === 0}
               >
                 Imprimer A4
+              </button>
+            </div>
+
+            <div className="button-row">
+              <button
+                type="button"
+                onClick={handleBatchExport}
+                disabled={photos.length === 0}
+              >
+                Exporter toutes les photos
+              </button>
+              <button
+                type="button"
+                onClick={handleZipExport}
+                disabled={photos.length === 0}
+              >
+                Exporter ZIP
               </button>
             </div>
           </form>

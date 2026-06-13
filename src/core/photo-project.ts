@@ -6,10 +6,15 @@ export type PhotoEditState = {
   faceGuideOpacity: number;
 };
 
+export type PhotoUsage = "college" | "sport" | "badge" | "autre";
+
 export type PhotoItem<TImage = HTMLImageElement> = {
   id: string;
   originalFileName: string;
   displayName: string;
+  firstName?: string;
+  lastName?: string;
+  usage?: PhotoUsage;
   image: TImage;
   editState: PhotoEditState;
   sheetCopies: number;
@@ -40,6 +45,9 @@ export function createPhotoItem<TImage>(
     id: input.id,
     originalFileName: input.originalFileName,
     displayName: input.displayName ?? getDefaultDisplayName(input.originalFileName),
+    firstName: undefined,
+    lastName: undefined,
+    usage: undefined,
     image: input.image,
     editState: getDefaultPhotoEditState(),
     sheetCopies: DEFAULT_SHEET_COPIES,

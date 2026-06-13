@@ -44,16 +44,32 @@ test("loads multiple local images, edits the active photo, and previews a multi-
 
   await expect(page.getByText("alice.png")).toBeVisible();
   await expect(page.getByText("bob.png")).toBeVisible();
+  await expect(page.getByText("2 images importees.")).toBeVisible();
   await expect(page.getByText("Total demande : 2 / 30 places.")).toBeVisible();
+
+  await page.getByRole("textbox", { name: "Prenom alice.png", exact: true }).fill("Alice");
+  await page.getByRole("textbox", { name: "Nom alice.png", exact: true }).fill("Dupont");
+  await page.getByLabel("Usage alice.png").selectOption("college");
+  await page.getByRole("button", { name: "Generer nom affiche" }).first().click();
+
+  await page.getByRole("textbox", { name: "Prenom bob.png", exact: true }).fill("Éléa");
+  await page.getByRole("textbox", { name: "Nom bob.png", exact: true }).fill("Sport");
+  await page.getByLabel("Usage bob.png").selectOption("sport");
+  await page.getByRole("button", { name: "Generer nom affiche" }).nth(1).click();
+
+  await page.getByLabel("Modele de nommage").selectOption("lastFirstIdentity");
+  await expect(page.getByText("Fichier : sport_elea_photo-identite.jpg")).toBeVisible();
 
   await page.getByRole("spinbutton", { name: "Copies alice.png" }).fill("4");
   await page.getByRole("spinbutton", { name: "Copies bob.png" }).fill("6");
   await expect(page.getByText("Total demande : 10 / 30 places.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Export planche A4" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Imprimer A4" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Exporter toutes les photos" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Exporter ZIP" })).toBeEnabled();
 
   await page.getByRole("button", { name: "Choisir bob.png" }).click();
-  await expect(page.getByRole("heading", { name: "bob" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Éléa Sport" })).toBeVisible();
   await expect(page.getByLabel("Afficher le guide visage")).toBeChecked();
 
   const photoDataBeforeGuideToggle = await canvas.evaluate((node) =>
@@ -129,6 +145,6 @@ test("loads multiple local images, edits the active photo, and previews a multi-
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export JPEG" }).click();
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe("photo-identite-413x531.jpg");
+  expect(download.suggestedFilename()).toBe("sport_elea_photo-identite.jpg");
   expect(requestsAfterLoad).toEqual([]);
 });

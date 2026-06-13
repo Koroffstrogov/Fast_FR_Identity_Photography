@@ -12,6 +12,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "jszip": "^3.10.1",
     "react": "latest",
     "react-dom": "latest"
   },
