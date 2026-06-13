@@ -89,11 +89,21 @@ h2 {
   line-height: 1.6;
 }
 
+.import-control {
+  width: min(420px, 100%);
+  margin-bottom: 18px;
+}
+
 .editor-layout {
   display: grid;
-  grid-template-columns: minmax(280px, 413px) minmax(280px, 360px);
+  grid-template-columns: minmax(240px, 300px) minmax(300px, 413px) minmax(280px, 340px);
   gap: 28px;
   align-items: start;
+}
+
+.photo-editor {
+  display: grid;
+  gap: 18px;
 }
 
 .canvas-panel {
@@ -152,6 +162,107 @@ h2 {
   background: #ffffff;
 }
 
+.photo-list-panel {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid #c8d2ce;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.photo-list-panel h2 {
+  font-size: 1.2rem;
+}
+
+.empty-list {
+  margin: 0;
+  color: #637179;
+  line-height: 1.45;
+}
+
+.photo-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.photo-list-item {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #d8e1de;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.photo-list-item.is-active {
+  border-color: #164e63;
+  background: #e6f4f4;
+}
+
+.photo-select-button {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+  min-height: 0;
+  padding: 8px 10px;
+  color: #172026;
+  text-align: left;
+  background: transparent;
+}
+
+.photo-select-button span {
+  grid-row: 1 / span 2;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 999px;
+  color: #ffffff;
+  background: #164e63;
+  font-weight: 700;
+}
+
+.photo-select-button strong,
+.photo-select-button small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.photo-select-button small {
+  color: #637179;
+}
+
+.compact-control {
+  display: grid;
+  gap: 6px;
+  color: #253137;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.compact-control input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid #bdc5ca;
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: #ffffff;
+}
+
+.remove-button {
+  min-height: 38px;
+  color: #7f1d1d;
+  background: #fee2e2;
+}
+
 .file-control,
 .slider-control,
 .number-control {
@@ -181,6 +292,13 @@ h2 {
   margin: 0;
   color: #9f1239;
   font-weight: 700;
+}
+
+.warning {
+  margin: 0;
+  color: #9f1239;
+  font-weight: 700;
+  line-height: 1.45;
 }
 
 .slider-control {
@@ -307,6 +425,12 @@ h2 {
   color: #4e5a60;
   font-size: 0.92rem;
   line-height: 1.45;
+}
+
+.sheet-total {
+  margin: 0;
+  color: #253137;
+  font-weight: 700;
 }
 
 .sheet-section {

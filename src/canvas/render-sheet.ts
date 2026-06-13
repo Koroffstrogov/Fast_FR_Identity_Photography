@@ -1,4 +1,5 @@
 import { PHOTO_FORMAT } from "../core/photo-format";
+import { PhotoItem } from "../core/photo-project";
 import {
   A4_PRINT_PAGE,
   PrintLayoutMode,
@@ -6,6 +7,8 @@ import {
   SheetPhotoSlot,
   getSheetLayout,
 } from "../core/print-layout";
+import { buildSheetComposition } from "../core/sheet-items";
+import { renderPhotoToCanvas } from "./render-photo";
 
 export function prepareSheetCanvas(
   canvas: HTMLCanvasElement,
@@ -33,6 +36,34 @@ export function renderSheetToCanvas(
   for (const slot of layout.photoSlots) {
     context.drawImage(
       photoCanvas,
+      slot.xPx,
+      slot.yPx,
+      slot.widthPx,
+      slot.heightPx,
+    );
+    drawCropMarks(context, slot, layout.cropMarkLengthPx);
+  }
+
+  drawControlRuler(context, layout);
+}
+
+export function renderPhotoItemsToSheetCanvas(
+  canvas: HTMLCanvasElement,
+  items: PhotoItem[],
+  mode: PrintLayoutMode,
+): void {
+  const context = prepareBaseSheet(canvas);
+  const layout = getSheetLayout(mode);
+  const composition = buildSheetComposition(items, mode);
+  const renderedPhotos = new Map<string, HTMLCanvasElement>();
+
+  for (const assignment of composition.slots) {
+    const item = items[assignment.itemIndex];
+    const slot = layout.photoSlots[assignment.sheetIndex];
+    const renderedPhoto = getRenderedPhotoCanvas(item, renderedPhotos);
+
+    context.drawImage(
+      renderedPhoto,
       slot.xPx,
       slot.yPx,
       slot.widthPx,
@@ -145,6 +176,23 @@ function assertPhotoCanvasSize(photoCanvas: HTMLCanvasElement): void {
       `photo canvas must be ${PHOTO_FORMAT.widthPx}x${PHOTO_FORMAT.heightPx}`,
     );
   }
+}
+
+function getRenderedPhotoCanvas(
+  item: PhotoItem,
+  renderedPhotos: Map<string, HTMLCanvasElement>,
+): HTMLCanvasElement {
+  const existingCanvas = renderedPhotos.get(item.id);
+
+  if (existingCanvas) {
+    return existingCanvas;
+  }
+
+  const canvas = document.createElement("canvas");
+  renderPhotoToCanvas(canvas, item.image, item.editState.transform);
+  renderedPhotos.set(item.id, canvas);
+
+  return canvas;
 }
 
 function getCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {

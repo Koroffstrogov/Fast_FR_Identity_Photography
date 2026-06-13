@@ -6,7 +6,9 @@ const SAMPLE_PNG = Buffer.from(
   "base64",
 );
 
-test("loads a local image, adjusts it, and exports the expected JPEG", async ({ page }) => {
+test("loads multiple local images, edits the active photo, and previews a multi-person sheet", async ({
+  page,
+}) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /photo d'identite/i })).toBeVisible();
 
@@ -27,15 +29,31 @@ test("loads a local image, adjusts it, and exports the expected JPEG", async ({ 
     }
   });
 
-  await page.getByLabel("Image locale").setInputFiles({
-    name: "sample.png",
-    mimeType: "image/png",
-    buffer: SAMPLE_PNG,
-  });
+  await page.getByLabel("Images locales").setInputFiles([
+    {
+      name: "alice.png",
+      mimeType: "image/png",
+      buffer: SAMPLE_PNG,
+    },
+    {
+      name: "bob.png",
+      mimeType: "image/png",
+      buffer: SAMPLE_PNG,
+    },
+  ]);
 
-  await expect(page.getByText("sample.png")).toBeVisible();
+  await expect(page.getByText("alice.png")).toBeVisible();
+  await expect(page.getByText("bob.png")).toBeVisible();
+  await expect(page.getByText("Total demande : 2 / 30 places.")).toBeVisible();
+
+  await page.getByRole("spinbutton", { name: "Copies alice.png" }).fill("4");
+  await page.getByRole("spinbutton", { name: "Copies bob.png" }).fill("6");
+  await expect(page.getByText("Total demande : 10 / 30 places.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Export planche A4" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Imprimer A4" })).toBeEnabled();
+
+  await page.getByRole("button", { name: "Choisir bob.png" }).click();
+  await expect(page.getByRole("heading", { name: "bob" })).toBeVisible();
   await expect(page.getByLabel("Afficher le guide visage")).toBeChecked();
 
   const photoDataBeforeGuideToggle = await canvas.evaluate((node) =>
@@ -65,9 +83,6 @@ test("loads a local image, adjusts it, and exports the expected JPEG", async ({ 
     await canvas.evaluate((node) => (node as HTMLCanvasElement).toDataURL("image/jpeg")),
   ).toBe(photoDataBeforeGuideToggle);
 
-  await page.getByRole("spinbutton", { name: "Nombre de photos" }).fill("5");
-  await expect(page.getByRole("spinbutton", { name: "Nombre de photos" })).toHaveValue("5");
-
   await page.getByRole("slider", { name: "Zoom" }).evaluate((input) => {
     const range = input as HTMLInputElement;
     range.value = "1.5";
@@ -86,15 +101,30 @@ test("loads a local image, adjusts it, and exports the expected JPEG", async ({ 
 
   if (canvasBox) {
     await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
-    await page.mouse.wheel(0, -240);
+    await canvas.dispatchEvent("wheel", {
+      deltaY: -240,
+      clientX: canvasBox.x + canvasBox.width / 2,
+      clientY: canvasBox.y + canvasBox.height / 2,
+      bubbles: true,
+      cancelable: true,
+    });
     await expect
       .poll(async () => Number(await page.getByRole("slider", { name: "Zoom" }).inputValue()))
       .not.toBe(1.5);
 
     await page.mouse.down();
-    await page.mouse.move(canvasBox.x + canvasBox.width / 2 + 20, canvasBox.y + canvasBox.height / 2 + 10);
+    await page.mouse.move(
+      canvasBox.x + canvasBox.width / 2 + 20,
+      canvasBox.y + canvasBox.height / 2 + 10,
+    );
     await page.mouse.up();
   }
+
+  await expect
+    .poll(async () => (await sheetCanvas.evaluate((node) =>
+      (node as HTMLCanvasElement).toDataURL("image/jpeg"),
+    )).length)
+    .toBeGreaterThan(1000);
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export JPEG" }).click();

@@ -2,27 +2,35 @@ import { ChangeEvent, PointerEvent, useEffect, useMemo, useRef, useState } from 
 import { exportCanvasToJpeg, exportSheetCanvasToJpeg } from "../canvas/export-jpeg";
 import { prepareGuideCanvas, renderFranceOfficialFaceGuide } from "../canvas/render-guide";
 import { PHOTO_CANVAS_SIZE, preparePhotoCanvas, renderPhotoToCanvas } from "../canvas/render-photo";
-import { prepareSheetCanvas, renderSheetToCanvas } from "../canvas/render-sheet";
+import {
+  prepareSheetCanvas,
+  renderPhotoItemsToSheetCanvas,
+} from "../canvas/render-sheet";
 import {
   DEFAULT_IMAGE_TRANSFORM,
-  ImageTransform,
-  ZOOM_MAX,
-  ZOOM_MIN,
   getCanvasPointFromClientPoint,
   scalePointerDeltaToCanvas,
   zoomTransformAtPoint,
 } from "../core/geometry";
-import { PHOTO_FORMAT } from "../core/photo-format";
+import {
+  PhotoItem,
+  clampCopies,
+  createPhotoItem,
+  getNextActivePhotoId,
+  removePhotoItem,
+  updatePhotoItem,
+} from "../core/photo-project";
 import {
   A4_PRINT_PAGE,
   PRINT_LAYOUTS,
   PrintLayoutMode,
-  clampSheetPhotoCount,
   getSheetCapacity,
-  getSheetLayout,
 } from "../core/print-layout";
+import { buildSheetComposition } from "../core/sheet-items";
 import { loadImageFile } from "../io/load-image-file";
 import { openA4PrintPage } from "../print/open-print-page";
+import { PhotoEditor } from "./PhotoEditor";
+import { PhotoList } from "./PhotoList";
 
 type DragState = {
   pointerId: number;
@@ -30,23 +38,25 @@ type DragState = {
   y: number;
 };
 
+let photoIdCounter = 0;
+
 export function App() {
   const photoCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const guideCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const sheetCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const dragStateRef = useRef<DragState | null>(null);
-  const [image, setImage] = useState<HTMLImageElement | null>(null);
-  const [fileName, setFileName] = useState("");
+  const [photos, setPhotos] = useState<PhotoItem[]>([]);
+  const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [transform, setTransform] = useState<ImageTransform>(DEFAULT_IMAGE_TRANSFORM);
-  const [showFaceGuide, setShowFaceGuide] = useState(true);
-  const [faceGuideOpacity, setFaceGuideOpacity] = useState(0.82);
   const [sheetMode, setSheetMode] = useState<PrintLayoutMode>("standard");
-  const [sheetPhotoCount, setSheetPhotoCount] = useState(getSheetCapacity("standard"));
   const sheetCapacity = useMemo(() => getSheetCapacity(sheetMode), [sheetMode]);
-  const sheetLayout = useMemo(
-    () => getSheetLayout(sheetMode, sheetPhotoCount),
-    [sheetMode, sheetPhotoCount],
+  const activePhoto = useMemo(
+    () => photos.find((photo) => photo.id === activePhotoId) ?? null,
+    [activePhotoId, photos],
+  );
+  const sheetComposition = useMemo(
+    () => buildSheetComposition(photos, sheetMode),
+    [photos, sheetMode],
   );
 
   useEffect(() => {
@@ -57,15 +67,18 @@ export function App() {
       return;
     }
 
-    if (image) {
-      renderPhotoToCanvas(photoCanvas, image, transform);
-      renderSheetToCanvas(sheetCanvas, photoCanvas, sheetMode, sheetPhotoCount);
-      return;
+    if (activePhoto) {
+      renderPhotoToCanvas(photoCanvas, activePhoto.image, activePhoto.editState.transform);
+    } else {
+      preparePhotoCanvas(photoCanvas);
     }
 
-    preparePhotoCanvas(photoCanvas);
-    prepareSheetCanvas(sheetCanvas, sheetMode, sheetPhotoCount);
-  }, [image, sheetMode, sheetPhotoCount, transform]);
+    if (photos.length > 0) {
+      renderPhotoItemsToSheetCanvas(sheetCanvas, photos, sheetMode);
+    } else {
+      prepareSheetCanvas(sheetCanvas, sheetMode);
+    }
+  }, [activePhoto, photos, sheetMode]);
 
   useEffect(() => {
     const guideCanvas = guideCanvasRef.current;
@@ -74,13 +87,13 @@ export function App() {
       return;
     }
 
-    if (showFaceGuide) {
-      renderFranceOfficialFaceGuide(guideCanvas, faceGuideOpacity);
+    if (activePhoto?.editState.showFaceGuide) {
+      renderFranceOfficialFaceGuide(guideCanvas, activePhoto.editState.faceGuideOpacity);
       return;
     }
 
     prepareGuideCanvas(guideCanvas);
-  }, [faceGuideOpacity, showFaceGuide]);
+  }, [activePhoto]);
 
   useEffect(() => {
     const canvas = photoCanvasRef.current;
@@ -90,7 +103,7 @@ export function App() {
     }
 
     function handleWheel(event: WheelEvent) {
-      if (!image || !canvas) {
+      if (!activePhotoId || !canvas) {
         return;
       }
 
@@ -112,14 +125,18 @@ export function App() {
       );
       const zoomFactor = Math.exp(-event.deltaY * 0.0015);
 
-      setTransform((current) =>
-        zoomTransformAtPoint(
-          current,
-          PHOTO_CANVAS_SIZE,
-          canvasPoint,
-          current.zoom * zoomFactor,
-        ),
-      );
+      updatePhoto(activePhotoId, (photo) => ({
+        ...photo,
+        editState: {
+          ...photo.editState,
+          transform: zoomTransformAtPoint(
+            photo.editState.transform,
+            PHOTO_CANVAS_SIZE,
+            canvasPoint,
+            photo.editState.transform.zoom * zoomFactor,
+          ),
+        },
+      }));
     }
 
     canvas.addEventListener("wheel", handleWheel, { passive: false });
@@ -127,41 +144,103 @@ export function App() {
     return () => {
       canvas.removeEventListener("wheel", handleWheel);
     };
-  }, [image]);
+  }, [activePhotoId]);
 
   useEffect(() => {
-    setSheetPhotoCount((current) => clampSheetPhotoCount(sheetMode, current));
-  }, [sheetMode]);
+    setPhotos((currentPhotos) =>
+      currentPhotos.map((photo) => ({
+        ...photo,
+        sheetCopies: clampCopies(photo.sheetCopies, sheetCapacity),
+      })),
+    );
+  }, [sheetCapacity]);
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0];
+    const files = Array.from(event.currentTarget.files ?? []);
+    event.currentTarget.value = "";
 
-    if (!file) {
+    if (files.length === 0) {
       return;
     }
 
     try {
-      const loadedImage = await loadImageFile(file);
-      setImage(loadedImage);
-      setFileName(file.name);
+      const loadedPhotos = await Promise.all(
+        files.map(async (file) =>
+          createPhotoItem({
+            id: createPhotoItemId(),
+            originalFileName: file.name,
+            image: await loadImageFile(file),
+          }),
+        ),
+      );
+
+      setPhotos((currentPhotos) => [...currentPhotos, ...loadedPhotos]);
+      setActivePhotoId((currentActivePhotoId) =>
+        currentActivePhotoId ?? loadedPhotos[0]?.id ?? null,
+      );
       setError("");
-      setTransform(DEFAULT_IMAGE_TRANSFORM);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Image illisible.");
-      setImage(null);
-      setFileName("");
     }
   }
 
-  function updateTransform(partialTransform: Partial<ImageTransform>) {
-    setTransform((current) => ({
-      ...current,
-      ...partialTransform,
+  function updatePhoto(photoId: string, updater: (photo: PhotoItem) => PhotoItem) {
+    setPhotos((currentPhotos) => updatePhotoItem(currentPhotos, photoId, updater));
+  }
+
+  function updateActivePhoto(updater: (photo: PhotoItem) => PhotoItem) {
+    if (!activePhotoId) {
+      return;
+    }
+
+    updatePhoto(activePhotoId, updater);
+  }
+
+  function handleTransformChange(partialTransform: Partial<PhotoItem["editState"]["transform"]>) {
+    updateActivePhoto((photo) => ({
+      ...photo,
+      editState: {
+        ...photo.editState,
+        transform: {
+          ...photo.editState.transform,
+          ...partialTransform,
+        },
+      },
+    }));
+  }
+
+  function handleGuideVisibilityChange(showFaceGuide: boolean) {
+    updateActivePhoto((photo) => ({
+      ...photo,
+      editState: {
+        ...photo.editState,
+        showFaceGuide,
+      },
+    }));
+  }
+
+  function handleGuideOpacityChange(faceGuideOpacity: number) {
+    updateActivePhoto((photo) => ({
+      ...photo,
+      editState: {
+        ...photo.editState,
+        faceGuideOpacity,
+      },
+    }));
+  }
+
+  function handleResetActivePhoto() {
+    updateActivePhoto((photo) => ({
+      ...photo,
+      editState: {
+        ...photo.editState,
+        transform: { ...DEFAULT_IMAGE_TRANSFORM },
+      },
     }));
   }
 
   function handlePointerDown(event: PointerEvent<HTMLCanvasElement>) {
-    if (!image) {
+    if (!activePhotoId) {
       return;
     }
 
@@ -176,7 +255,7 @@ export function App() {
   function handlePointerMove(event: PointerEvent<HTMLCanvasElement>) {
     const dragState = dragStateRef.current;
 
-    if (!image || !dragState || dragState.pointerId !== event.pointerId) {
+    if (!activePhotoId || !dragState || dragState.pointerId !== event.pointerId) {
       return;
     }
 
@@ -199,10 +278,16 @@ export function App() {
       y: event.clientY,
     };
 
-    setTransform((current) => ({
-      ...current,
-      offsetX: current.offsetX + canvasDelta.x,
-      offsetY: current.offsetY + canvasDelta.y,
+    updatePhoto(activePhotoId, (photo) => ({
+      ...photo,
+      editState: {
+        ...photo.editState,
+        transform: {
+          ...photo.editState.transform,
+          offsetX: photo.editState.transform.offsetX + canvasDelta.x,
+          offsetY: photo.editState.transform.offsetY + canvasDelta.y,
+        },
+      },
     }));
   }
 
@@ -212,10 +297,34 @@ export function App() {
     }
   }
 
-  function handleExport() {
+  function handleDisplayNameChange(photoId: string, displayName: string) {
+    updatePhoto(photoId, (photo) => ({
+      ...photo,
+      displayName,
+    }));
+  }
+
+  function handleCopiesChange(photoId: string, copies: number) {
+    updatePhoto(photoId, (photo) => ({
+      ...photo,
+      sheetCopies: clampCopies(copies, sheetCapacity),
+    }));
+  }
+
+  function handleRemovePhoto(photoId: string) {
+    setPhotos((currentPhotos) => {
+      setActivePhotoId((currentActivePhotoId) =>
+        getNextActivePhotoId(currentPhotos, photoId, currentActivePhotoId),
+      );
+
+      return removePhotoItem(currentPhotos, photoId);
+    });
+  }
+
+  function handleExportPhoto() {
     const canvas = photoCanvasRef.current;
 
-    if (!canvas || !image) {
+    if (!canvas || !activePhoto) {
       return;
     }
 
@@ -228,20 +337,20 @@ export function App() {
   function handleSheetExport() {
     const canvas = sheetCanvasRef.current;
 
-    if (!canvas || !image) {
+    if (!canvas || photos.length === 0) {
       return;
     }
 
     const link = document.createElement("a");
     link.href = exportSheetCanvasToJpeg(canvas);
-    link.download = `planche-a4-${sheetMode}-${sheetLayout.photoCount}-photos.jpg`;
+    link.download = `planche-a4-${sheetMode}-${sheetComposition.renderedCount}-photos.jpg`;
     link.click();
   }
 
   function handlePrintSheet() {
     const canvas = sheetCanvasRef.current;
 
-    if (!canvas || !image) {
+    if (!canvas || photos.length === 0) {
       return;
     }
 
@@ -264,126 +373,44 @@ export function App() {
           <p className="eyebrow">Traitement local</p>
           <h1 id="app-title">Photo d'identite 35 x 45 mm</h1>
           <p>
-            Chargez une image depuis ce PC, cadrez-la dans le canvas, puis exportez
-            un JPEG {PHOTO_FORMAT.widthPx} x {PHOTO_FORMAT.heightPx} px ou une
-            planche A4 imprimable.
+            Importez plusieurs images depuis ce PC, cadrez chaque personne, puis
+            generez une planche A4 avec le nombre de copies voulu.
           </p>
         </div>
 
+        <label className="file-control import-control">
+          <span>Images locales</span>
+          <input type="file" accept="image/*" multiple onChange={handleFileChange} />
+        </label>
+
+        {error && <p className="error" role="alert">{error}</p>}
+
         <div className="editor-layout">
-          <div className="canvas-panel">
-            <canvas
-              ref={photoCanvasRef}
-              width={PHOTO_FORMAT.widthPx}
-              height={PHOTO_FORMAT.heightPx}
-              className={image ? "photo-canvas is-draggable" : "photo-canvas"}
-              aria-label="Apercu photo 35 par 45 millimetres"
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerEnd}
-              onPointerCancel={handlePointerEnd}
-            />
-            {!image && (
-              <div className="canvas-empty" aria-hidden="true">
-                Importez une image
-              </div>
-            )}
-            <canvas
-              ref={guideCanvasRef}
-              width={PHOTO_FORMAT.widthPx}
-              height={PHOTO_FORMAT.heightPx}
-              className="guide-canvas"
-              aria-hidden="true"
-            />
-          </div>
+          <PhotoList
+            photos={photos}
+            activePhotoId={activePhotoId}
+            sheetCapacity={sheetCapacity}
+            onSelectPhoto={setActivePhotoId}
+            onDisplayNameChange={handleDisplayNameChange}
+            onCopiesChange={handleCopiesChange}
+            onRemovePhoto={handleRemovePhoto}
+          />
 
-          <form className="controls" onSubmit={(event) => event.preventDefault()}>
-            <label className="file-control">
-              <span>Image locale</span>
-              <input type="file" accept="image/*" onChange={handleFileChange} />
-            </label>
+          <PhotoEditor
+            photo={activePhoto}
+            photoCanvasRef={photoCanvasRef}
+            guideCanvasRef={guideCanvasRef}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerEnd={handlePointerEnd}
+            onTransformChange={handleTransformChange}
+            onGuideVisibilityChange={handleGuideVisibilityChange}
+            onGuideOpacityChange={handleGuideOpacityChange}
+            onResetPhoto={handleResetActivePhoto}
+            onExportPhoto={handleExportPhoto}
+          />
 
-            {fileName && <p className="file-name">{fileName}</p>}
-            {error && <p className="error" role="alert">{error}</p>}
-
-            <label className="slider-control">
-              <span>Zoom</span>
-              <output>{transform.zoom.toFixed(2)}x</output>
-              <input
-                aria-label="Zoom"
-                type="range"
-                min={ZOOM_MIN}
-                max={ZOOM_MAX}
-                step="0.01"
-                value={transform.zoom}
-                onChange={(event) => updateTransform({ zoom: Number(event.currentTarget.value) })}
-                disabled={!image}
-              />
-            </label>
-
-            <fieldset className="guide-control">
-              <legend>Guide visage</legend>
-              <label className="check-control">
-                <input
-                  type="checkbox"
-                  checked={showFaceGuide}
-                  onChange={(event) => setShowFaceGuide(event.currentTarget.checked)}
-                />
-                <span>Afficher le guide visage</span>
-              </label>
-              <label className="slider-control">
-                <span>Opacite du guide</span>
-                <output>{Math.round(faceGuideOpacity * 100)}%</output>
-                <input
-                  aria-label="Opacite du guide"
-                  type="range"
-                  min="0.15"
-                  max="1"
-                  step="0.01"
-                  value={faceGuideOpacity}
-                  onChange={(event) =>
-                    setFaceGuideOpacity(Number(event.currentTarget.value))
-                  }
-                  disabled={!showFaceGuide}
-                />
-              </label>
-              <p className="guide-note">
-                Gabarit base sur les recommandations francaises : visage 32-36 mm
-                du menton au sommet du crane, hors cheveux.
-              </p>
-            </fieldset>
-
-            <label className="slider-control">
-              <span>Rotation</span>
-              <output>{transform.rotationDegrees.toFixed(1)} deg</output>
-              <input
-                aria-label="Rotation"
-                type="range"
-                min="-20"
-                max="20"
-                step="0.1"
-                value={transform.rotationDegrees}
-                onChange={(event) =>
-                  updateTransform({ rotationDegrees: Number(event.currentTarget.value) })
-                }
-                disabled={!image}
-              />
-            </label>
-
-            <div className="button-row">
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => setTransform(DEFAULT_IMAGE_TRANSFORM)}
-                disabled={!image}
-              >
-                Reinitialiser
-              </button>
-              <button type="button" onClick={handleExport} disabled={!image}>
-                Export JPEG
-              </button>
-            </div>
-
+          <form className="controls sheet-controls" onSubmit={(event) => event.preventDefault()}>
             <fieldset className="mode-control">
               <legend>Planche A4</legend>
               <div className="segmented-options">
@@ -405,25 +432,16 @@ export function App() {
               </div>
             </fieldset>
 
-            <label className="number-control">
-              <span>Nombre de photos</span>
-              <output>
-                {sheetPhotoCount}/{sheetCapacity}
-              </output>
-              <input
-                aria-label="Nombre de photos"
-                type="number"
-                min="1"
-                max={sheetCapacity}
-                step="1"
-                value={sheetPhotoCount}
-                onChange={(event) =>
-                  setSheetPhotoCount(
-                    clampSheetPhotoCount(sheetMode, event.currentTarget.valueAsNumber),
-                  )
-                }
-              />
-            </label>
+            <p className="sheet-total">
+              Total demande : {sheetComposition.requestedCount} / {sheetComposition.capacity} places.
+            </p>
+
+            {sheetComposition.isLimited && (
+              <p className="warning" role="alert">
+                Le total depasse la capacite. L'export sera limite aux{" "}
+                {sheetComposition.capacity} premieres photos.
+              </p>
+            )}
 
             <p className="print-note">
               Impression a 100 %, sans ajustement a la page. Verifiez la regle
@@ -431,10 +449,18 @@ export function App() {
             </p>
 
             <div className="button-row">
-              <button type="button" onClick={handleSheetExport} disabled={!image}>
+              <button
+                type="button"
+                onClick={handleSheetExport}
+                disabled={photos.length === 0}
+              >
                 Export planche A4
               </button>
-              <button type="button" onClick={handlePrintSheet} disabled={!image}>
+              <button
+                type="button"
+                onClick={handlePrintSheet}
+                disabled={photos.length === 0}
+              >
                 Imprimer A4
               </button>
             </div>
@@ -448,8 +474,8 @@ export function App() {
             <p>
               Page {A4_PRINT_PAGE.widthMm} x {A4_PRINT_PAGE.heightMm} mm a{" "}
               {A4_PRINT_PAGE.dpi} dpi, marge {A4_PRINT_PAGE.marginMm} mm, mode{" "}
-              {sheetMode === "standard" ? "standard" : "confort"} de{" "}
-              {sheetLayout.photoCount} photos.
+              {sheetMode === "standard" ? "standard" : "confort"} :{" "}
+              {sheetComposition.renderedCount} photo(s) rendue(s).
             </p>
           </div>
           <div className="sheet-preview-panel">
@@ -465,4 +491,14 @@ export function App() {
       </section>
     </main>
   );
+}
+
+function createPhotoItemId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  photoIdCounter += 1;
+
+  return `photo-${Date.now()}-${photoIdCounter}`;
 }
