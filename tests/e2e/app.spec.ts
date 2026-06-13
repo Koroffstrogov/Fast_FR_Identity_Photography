@@ -24,12 +24,16 @@ test("loads multiple local images, edits the active photo, and previews a multi-
   await expect(finalPreviewCanvas).toHaveAttribute("width", "413");
   await expect(finalPreviewCanvas).toHaveAttribute("height", "531");
 
-  const requestsAfterLoad: string[] = [];
+  const pageOrigin = new URL(page.url()).origin;
+  const externalRequestsAfterLoad: string[] = [];
   page.on("request", (request) => {
     const url = new URL(request.url());
 
-    if (url.protocol === "http:" || url.protocol === "https:") {
-      requestsAfterLoad.push(request.url());
+    if (
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      url.origin !== pageOrigin
+    ) {
+      externalRequestsAfterLoad.push(request.url());
     }
   });
 
@@ -82,6 +86,12 @@ test("loads multiple local images, edits the active photo, and previews a multi-
   await page.getByRole("button", { name: "Choisir bob.png" }).click();
   await expect(page.getByRole("heading", { name: "Éléa Sport" })).toBeVisible();
   await expect(page.getByLabel("Afficher le guide visage")).toBeChecked();
+  await expect(page.getByRole("button", { name: "Detecter le visage" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Detecter le visage" }).click();
+  await expect(
+    page.getByText(/Impossible de charger le modele visage local|Aucun visage exploitable/),
+  ).toBeVisible();
 
   const photoDataBeforeGuideToggle = await canvas.evaluate((node) =>
     (node as HTMLCanvasElement).toDataURL("image/jpeg"),
@@ -109,6 +119,24 @@ test("loads multiple local images, edits the active photo, and previews a multi-
   expect(
     await canvas.evaluate((node) => (node as HTMLCanvasElement).toDataURL("image/jpeg")),
   ).toBe(photoDataBeforeGuideToggle);
+
+  await page.getByLabel("Assistant manuel visage").check();
+  await expect(page.getByText("Points manuels : 0/3.")).toBeVisible();
+
+  await canvas.click({ position: { x: 206, y: 239 } });
+  await expect(page.getByText("1/3 point(s) manuel(s) places.")).toBeVisible();
+  await canvas.click({ position: { x: 206, y: 398 } });
+  await expect(page.getByText("2/3 point(s) manuel(s) places.")).toBeVisible();
+
+  expect(
+    await canvas.evaluate((node) => (node as HTMLCanvasElement).toDataURL("image/jpeg")),
+  ).toBe(photoDataBeforeGuideToggle);
+  await expect(
+    page.getByRole("button", { name: "Appliquer le cadrage manuel" }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Reinitialiser les points" }).click();
+  await expect(page.getByText("Points manuels : 0/3.")).toBeVisible();
+  await page.getByLabel("Assistant manuel visage").uncheck();
 
   await page.getByRole("slider", { name: "Zoom" }).evaluate((input) => {
     const range = input as HTMLInputElement;
@@ -157,5 +185,5 @@ test("loads multiple local images, edits the active photo, and previews a multi-
   await page.getByRole("button", { name: "Export JPEG" }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("sport_elea_photo-identite.jpg");
-  expect(requestsAfterLoad).toEqual([]);
+  expect(externalRequestsAfterLoad).toEqual([]);
 });

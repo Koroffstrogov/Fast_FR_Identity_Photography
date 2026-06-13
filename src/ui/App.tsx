@@ -1,6 +1,10 @@
 import { ChangeEvent, PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { exportCanvasToJpeg, exportSheetCanvasToJpeg } from "../canvas/export-jpeg";
-import { prepareGuideCanvas, renderFranceOfficialFaceGuide } from "../canvas/render-guide";
+import {
+  GuideOverlayPoint,
+  prepareGuideCanvas,
+  renderFaceGuideOverlay,
+} from "../canvas/render-guide";
 import { PHOTO_CANVAS_SIZE, preparePhotoCanvas, renderPhotoToCanvas } from "../canvas/render-photo";
 import {
   prepareSheetCanvas,
@@ -10,6 +14,7 @@ import {
   DEFAULT_IMAGE_TRANSFORM,
   getCanvasPointFromClientPoint,
   scalePointerDeltaToCanvas,
+  Size,
   zoomTransformAtPoint,
 } from "../core/geometry";
 import {
@@ -23,9 +28,13 @@ import {
   PhotoItem,
   PhotoUsage,
   clampCopies,
+  getDefaultPhotoFaceDetectionState,
+  getManualFacePointLabel,
   getNextActivePhotoId,
+  getNextManualFacePointKind,
   removePhotoItem,
   updatePhotoItem,
+  upsertManualFacePoint,
 } from "../core/photo-project";
 import { PrintLayoutMode, getSheetCapacity } from "../core/print-layout";
 import { buildSheetComposition } from "../core/sheet-items";
@@ -45,6 +54,19 @@ import { FinalPhotoPreview } from "./FinalPhotoPreview";
 import { PhotoEditor } from "./PhotoEditor";
 import { PhotoList } from "./PhotoList";
 import { SheetPreview } from "./SheetPreview";
+import {
+  FaceLandmarkerModelStatus,
+  detectFaceLandmarks,
+  getFaceLandmarkerErrorMessage,
+  loadFaceLandmarker,
+} from "../vision/face-landmarker";
+import { analyzeFaceLandmarks } from "../vision/face-landmarks";
+import {
+  canvasPointToSourceImagePoint,
+  createFacePlacementFromCandidate,
+  createFacePlacementFromManualPoints,
+  sourceImagePointToCanvasPoint,
+} from "../vision/face-placement";
 
 type DragState = {
   pointerId: number;
@@ -67,6 +89,9 @@ export function App() {
   const [sheetMode, setSheetMode] = useState<PrintLayoutMode>("standard");
   const [fileNamingTemplate, setFileNamingTemplate] =
     useState<FileNamingTemplateId>("displayNameIdentity");
+  const [faceModelStatus, setFaceModelStatus] =
+    useState<FaceLandmarkerModelStatus>("idle");
+  const [faceModelError, setFaceModelError] = useState("");
   const sheetCapacity = useMemo(() => getSheetCapacity(sheetMode), [sheetMode]);
   const activePhoto = useMemo(
     () => photos.find((photo) => photo.id === activePhotoId) ?? null,
@@ -109,8 +134,12 @@ export function App() {
       return;
     }
 
-    if (activePhoto?.editState.showFaceGuide) {
-      renderFranceOfficialFaceGuide(guideCanvas, activePhoto.editState.faceGuideOpacity);
+    if (activePhoto) {
+      renderFaceGuideOverlay(guideCanvas, {
+        showGuide: activePhoto.editState.showFaceGuide,
+        opacity: activePhoto.editState.faceGuideOpacity,
+        manualPoints: getManualGuideOverlayPoints(activePhoto),
+      });
       return;
     }
 
@@ -263,8 +292,249 @@ export function App() {
     }));
   }
 
+  async function ensureFaceModelLoaded(): Promise<string | null> {
+    if (faceModelStatus === "ready") {
+      return null;
+    }
+
+    setFaceModelStatus("loading");
+    setFaceModelError("");
+
+    try {
+      await loadFaceLandmarker();
+      setFaceModelStatus("ready");
+      return null;
+    } catch (loadError) {
+      const message =
+        loadError instanceof Error
+          ? loadError.message
+          : getFaceLandmarkerErrorMessage(loadError);
+      setFaceModelStatus("error");
+      setFaceModelError(message);
+
+      return message;
+    }
+  }
+
+  function handleLoadFaceModel() {
+    void ensureFaceModelLoaded();
+  }
+
+  async function handleDetectFace() {
+    const photo = activePhoto;
+
+    if (!photo) {
+      return;
+    }
+
+    updatePhoto(photo.id, (currentPhoto) => ({
+      ...currentPhoto,
+      faceDetection: {
+        ...(currentPhoto.faceDetection ?? getDefaultPhotoFaceDetectionState()),
+        status: "detecting",
+        diagnostics: [],
+        message: "Detection visage en cours.",
+      },
+    }));
+
+    const modelErrorMessage = await ensureFaceModelLoaded();
+
+    if (modelErrorMessage) {
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        faceDetection: {
+          ...(currentPhoto.faceDetection ?? getDefaultPhotoFaceDetectionState()),
+          status: "error",
+          diagnostics: [],
+          message: modelErrorMessage,
+        },
+      }));
+      return;
+    }
+
+    try {
+      const detectionResult = await detectFaceLandmarks(photo.image);
+      const analysis = analyzeFaceLandmarks(detectionResult.faceLandmarks);
+
+      if (!analysis.selectedFace) {
+        updatePhoto(photo.id, (currentPhoto) => ({
+          ...currentPhoto,
+          faceDetection: {
+            ...(currentPhoto.faceDetection ?? getDefaultPhotoFaceDetectionState()),
+            status: "not-found",
+            diagnostics: analysis.diagnostics,
+            message: "Aucun visage exploitable n'a ete detecte.",
+          },
+        }));
+        return;
+      }
+
+      const placement = createFacePlacementFromCandidate(
+        analysis.selectedFace,
+        getPhotoImageSize(photo),
+      );
+      const diagnostics = dedupeDiagnostics([
+        ...analysis.diagnostics,
+        ...placement.diagnostics,
+      ]);
+
+      if (!placement.transform) {
+        updatePhoto(photo.id, (currentPhoto) => ({
+          ...currentPhoto,
+          faceDetection: {
+            ...(currentPhoto.faceDetection ?? getDefaultPhotoFaceDetectionState()),
+            status: "error",
+            diagnostics,
+            message: placement.message,
+          },
+        }));
+        return;
+      }
+
+      const proposedTransform = placement.transform;
+
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        editState: {
+          ...currentPhoto.editState,
+          transform: proposedTransform,
+        },
+        faceDetection: {
+          ...(currentPhoto.faceDetection ?? getDefaultPhotoFaceDetectionState()),
+          status: "detected",
+          diagnostics,
+          message: placement.message,
+        },
+      }));
+    } catch (detectError) {
+      const message =
+        detectError instanceof Error
+          ? detectError.message
+          : "Impossible de detecter le visage sur la photo active.";
+
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        faceDetection: {
+          ...(currentPhoto.faceDetection ?? getDefaultPhotoFaceDetectionState()),
+          status: "error",
+          diagnostics: [],
+          message,
+        },
+      }));
+    }
+  }
+
+  function handleManualAssistantChange(enabled: boolean) {
+    updateActivePhoto((photo) => {
+      const faceDetection = photo.faceDetection ?? getDefaultPhotoFaceDetectionState();
+
+      return {
+        ...photo,
+        faceDetection: {
+          ...faceDetection,
+          status: enabled ? "manual" : faceDetection.status,
+          manualAssistantEnabled: enabled,
+          message: enabled
+            ? "Cliquez centre des yeux, menton, puis sommet du crane si utile."
+            : faceDetection.message,
+        },
+      };
+    });
+  }
+
+  function handleApplyManualFacePlacement() {
+    const photo = activePhoto;
+
+    if (!photo) {
+      return;
+    }
+
+    const faceDetection = photo.faceDetection ?? getDefaultPhotoFaceDetectionState();
+    const placement = createFacePlacementFromManualPoints(
+      faceDetection.manualPoints,
+      getPhotoImageSize(photo),
+    );
+
+    updatePhoto(photo.id, (currentPhoto) => ({
+      ...currentPhoto,
+      editState: placement.transform
+        ? {
+            ...currentPhoto.editState,
+            transform: placement.transform,
+          }
+        : currentPhoto.editState,
+      faceDetection: {
+        ...(currentPhoto.faceDetection ?? getDefaultPhotoFaceDetectionState()),
+        status: placement.transform ? "manual" : "error",
+        diagnostics: placement.diagnostics,
+        message: placement.message,
+      },
+    }));
+  }
+
+  function handleResetManualFacePoints() {
+    updateActivePhoto((photo) => ({
+      ...photo,
+      faceDetection: {
+        ...(photo.faceDetection ?? getDefaultPhotoFaceDetectionState()),
+        status: "manual",
+        manualPoints: [],
+        diagnostics: [],
+        message: "Points manuels reinitialises.",
+      },
+    }));
+  }
+
   function handlePointerDown(event: PointerEvent<HTMLCanvasElement>) {
-    if (!activePhotoId) {
+    if (!activePhotoId || !activePhoto) {
+      return;
+    }
+
+    if (activePhoto.faceDetection?.manualAssistantEnabled) {
+      event.preventDefault();
+      const rect = event.currentTarget.getBoundingClientRect();
+      const canvasPoint = getCanvasPointFromClientPoint(
+        {
+          x: event.clientX,
+          y: event.clientY,
+        },
+        {
+          x: rect.left,
+          y: rect.top,
+          width: rect.width,
+          height: rect.height,
+        },
+        PHOTO_CANVAS_SIZE,
+      );
+      const pointKind = getNextManualFacePointKind(
+        activePhoto.faceDetection.manualPoints,
+      );
+      const sourcePoint = canvasPointToSourceImagePoint(
+        canvasPoint,
+        getPhotoImageSize(activePhoto),
+        PHOTO_CANVAS_SIZE,
+        activePhoto.editState.transform,
+      );
+
+      updatePhoto(activePhotoId, (photo) => {
+        const faceDetection = photo.faceDetection ?? getDefaultPhotoFaceDetectionState();
+        const manualPoints = upsertManualFacePoint(faceDetection.manualPoints, {
+          kind: pointKind,
+          xPx: sourcePoint.x,
+          yPx: sourcePoint.y,
+        });
+
+        return {
+          ...photo,
+          faceDetection: {
+            ...faceDetection,
+            status: "manual",
+            manualAssistantEnabled: true,
+            manualPoints,
+            message: `${manualPoints.length}/3 point(s) manuel(s) places.`,
+          },
+        };
+      });
       return;
     }
 
@@ -521,6 +791,13 @@ export function App() {
               onGuideOpacityChange={handleGuideOpacityChange}
               onResetPhoto={handleResetActivePhoto}
               onExportPhoto={handleExportPhoto}
+              faceModelStatus={faceModelStatus}
+              faceModelError={faceModelError}
+              onLoadFaceModel={handleLoadFaceModel}
+              onDetectFace={handleDetectFace}
+              onManualAssistantChange={handleManualAssistantChange}
+              onApplyManualFacePlacement={handleApplyManualFacePlacement}
+              onResetManualFacePoints={handleResetManualFacePoints}
             />
             <FinalPhotoPreview photo={activePhoto} />
           </div>
@@ -547,6 +824,56 @@ export function App() {
       </section>
     </main>
   );
+}
+
+function getPhotoImageSize(photo: PhotoItem): Size {
+  return {
+    width: photo.image.naturalWidth,
+    height: photo.image.naturalHeight,
+  };
+}
+
+function getManualGuideOverlayPoints(photo: PhotoItem): GuideOverlayPoint[] {
+  const faceDetection = photo.faceDetection;
+
+  if (!faceDetection || faceDetection.manualPoints.length === 0) {
+    return [];
+  }
+
+  return faceDetection.manualPoints.map((point) => {
+    const canvasPoint = sourceImagePointToCanvasPoint(
+      {
+        x: point.xPx,
+        y: point.yPx,
+      },
+      getPhotoImageSize(photo),
+      PHOTO_CANVAS_SIZE,
+      photo.editState.transform,
+    );
+
+    return {
+      xPx: canvasPoint.x,
+      yPx: canvasPoint.y,
+      label: getManualFacePointLabel(point.kind),
+    };
+  });
+}
+
+function dedupeDiagnostics<TDiagnostic extends { code: string; message: string }>(
+  diagnostics: readonly TDiagnostic[],
+): TDiagnostic[] {
+  const seenDiagnostics = new Set<string>();
+
+  return diagnostics.filter((diagnostic) => {
+    const key = `${diagnostic.code}-${diagnostic.message}`;
+
+    if (seenDiagnostics.has(key)) {
+      return false;
+    }
+
+    seenDiagnostics.add(key);
+    return true;
+  });
 }
 
 function createPhotoItemId(): string {

@@ -8,6 +8,36 @@ export type PhotoEditState = {
 
 export type PhotoUsage = "college" | "sport" | "badge" | "autre";
 
+export type PhotoManualFacePointKind = "eyesCenter" | "chin" | "skullTop";
+
+export type PhotoManualFacePoint = {
+  kind: PhotoManualFacePointKind;
+  xPx: number;
+  yPx: number;
+};
+
+export type PhotoFaceDiagnostic = {
+  code: string;
+  severity: "info" | "warning" | "error";
+  message: string;
+};
+
+export type PhotoFaceDetectionStatus =
+  | "idle"
+  | "detecting"
+  | "detected"
+  | "not-found"
+  | "manual"
+  | "error";
+
+export type PhotoFaceDetectionState = {
+  status: PhotoFaceDetectionStatus;
+  manualAssistantEnabled: boolean;
+  manualPoints: PhotoManualFacePoint[];
+  diagnostics: PhotoFaceDiagnostic[];
+  message: string;
+};
+
 export type PhotoItem<TImage = HTMLImageElement> = {
   id: string;
   originalFileName: string;
@@ -17,6 +47,7 @@ export type PhotoItem<TImage = HTMLImageElement> = {
   usage?: PhotoUsage;
   image: TImage;
   editState: PhotoEditState;
+  faceDetection?: PhotoFaceDetectionState;
   sheetCopies: number;
 };
 
@@ -38,6 +69,16 @@ export function getDefaultPhotoEditState(): PhotoEditState {
   };
 }
 
+export function getDefaultPhotoFaceDetectionState(): PhotoFaceDetectionState {
+  return {
+    status: "idle",
+    manualAssistantEnabled: false,
+    manualPoints: [],
+    diagnostics: [],
+    message: "",
+  };
+}
+
 export function createPhotoItem<TImage>(
   input: CreatePhotoItemInput<TImage>,
 ): PhotoItem<TImage> {
@@ -50,6 +91,7 @@ export function createPhotoItem<TImage>(
     usage: undefined,
     image: input.image,
     editState: getDefaultPhotoEditState(),
+    faceDetection: getDefaultPhotoFaceDetectionState(),
     sheetCopies: DEFAULT_SHEET_COPIES,
   };
 }
@@ -104,6 +146,45 @@ export function clampCopies(copies: number, maxCopies: number): number {
   return Math.min(maxCopies, Math.max(1, Math.trunc(copies)));
 }
 
+export function getNextManualFacePointKind(
+  manualPoints: readonly PhotoManualFacePoint[],
+): PhotoManualFacePointKind {
+  if (!manualPoints.some((point) => point.kind === "eyesCenter")) {
+    return "eyesCenter";
+  }
+
+  if (!manualPoints.some((point) => point.kind === "chin")) {
+    return "chin";
+  }
+
+  return "skullTop";
+}
+
+export function upsertManualFacePoint(
+  manualPoints: readonly PhotoManualFacePoint[],
+  point: PhotoManualFacePoint,
+): PhotoManualFacePoint[] {
+  const nextPoints = manualPoints.filter(
+    (manualPoint) => manualPoint.kind !== point.kind,
+  );
+
+  return [...nextPoints, point].sort(
+    (firstPoint, secondPoint) =>
+      getManualPointOrder(firstPoint.kind) - getManualPointOrder(secondPoint.kind),
+  );
+}
+
+export function getManualFacePointLabel(kind: PhotoManualFacePointKind): string {
+  switch (kind) {
+    case "eyesCenter":
+      return "Yeux";
+    case "chin":
+      return "Menton";
+    case "skullTop":
+      return "Sommet";
+  }
+}
+
 function getDefaultDisplayName(fileName: string): string {
   const trimmedName = fileName.trim();
   const extensionIndex = trimmedName.lastIndexOf(".");
@@ -113,4 +194,15 @@ function getDefaultDisplayName(fileName: string): string {
   }
 
   return trimmedName.slice(0, extensionIndex);
+}
+
+function getManualPointOrder(kind: PhotoManualFacePointKind): number {
+  switch (kind) {
+    case "eyesCenter":
+      return 0;
+    case "chin":
+      return 1;
+    case "skullTop":
+      return 2;
+  }
 }

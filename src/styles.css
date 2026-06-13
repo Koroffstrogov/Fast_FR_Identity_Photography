@@ -425,7 +425,8 @@ h2 {
   font-weight: 700;
 }
 
-.guide-control {
+.guide-control,
+.face-detection-panel {
   display: grid;
   gap: 12px;
   min-width: 0;
@@ -435,6 +436,10 @@ h2 {
   border-radius: 8px;
   color: #253137;
   font-weight: 700;
+}
+
+.face-detection-panel button {
+  width: 100%;
 }
 
 .check-control {
@@ -454,6 +459,25 @@ h2 {
   color: #4e5a60;
   font-size: 0.9rem;
   font-weight: 500;
+  line-height: 1.45;
+}
+
+.model-status,
+.detection-message,
+.manual-note {
+  margin: 0;
+  color: #4e5a60;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.diagnostic-list {
+  margin: 0;
+  padding-left: 20px;
+  color: #7f1d1d;
+  font-size: 0.9rem;
+  font-weight: 600;
   line-height: 1.45;
 }
 

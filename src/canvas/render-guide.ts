@@ -1,6 +1,18 @@
 import { FaceGuide, getFranceOfficialFaceGuide } from "../core/face-guide";
 import { PHOTO_FORMAT } from "../core/photo-format";
 
+export type GuideOverlayPoint = {
+  xPx: number;
+  yPx: number;
+  label: string;
+};
+
+export type FaceGuideOverlayOptions = {
+  showGuide: boolean;
+  opacity: number;
+  manualPoints?: readonly GuideOverlayPoint[];
+};
+
 export function prepareGuideCanvas(canvas: HTMLCanvasElement): void {
   canvas.width = PHOTO_FORMAT.widthPx;
   canvas.height = PHOTO_FORMAT.heightPx;
@@ -17,6 +29,22 @@ export function renderFranceOfficialFaceGuide(
   opacity: number,
 ): void {
   renderFaceGuideToCanvas(canvas, getFranceOfficialFaceGuide(), opacity);
+}
+
+export function renderFaceGuideOverlay(
+  canvas: HTMLCanvasElement,
+  options: FaceGuideOverlayOptions,
+): void {
+  canvas.width = PHOTO_FORMAT.widthPx;
+  canvas.height = PHOTO_FORMAT.heightPx;
+
+  if (options.showGuide) {
+    renderFaceGuideToCanvas(canvas, getFranceOfficialFaceGuide(), options.opacity);
+  } else {
+    clearGuideCanvas(canvas);
+  }
+
+  drawManualPoints(canvas, options.manualPoints ?? []);
 }
 
 export function renderFaceGuideToCanvas(
@@ -74,6 +102,37 @@ export function renderFaceGuideToCanvas(
   drawLabel(context, "Sommet cible", 10, skullTargetYPx - 7, "#0f766e");
   drawLabel(context, "Menton", 10, chinYPx - 7, "#9f1239");
   drawLabel(context, "Yeux", 10, eyeYPx - 7, "#2563eb");
+
+  context.restore();
+}
+
+function drawManualPoints(
+  canvas: HTMLCanvasElement,
+  manualPoints: readonly GuideOverlayPoint[],
+): void {
+  if (manualPoints.length === 0) {
+    return;
+  }
+
+  const context = getCanvasContext(canvas);
+
+  context.save();
+  context.font = "15px Arial, sans-serif";
+  context.textAlign = "left";
+  context.textBaseline = "middle";
+
+  manualPoints.forEach((point) => {
+    context.beginPath();
+    context.arc(point.xPx, point.yPx, 7, 0, Math.PI * 2);
+    context.fillStyle = "rgb(22 78 99 / 90%)";
+    context.fill();
+    context.lineWidth = 2;
+    context.strokeStyle = "#ffffff";
+    context.stroke();
+
+    context.fillStyle = "#164e63";
+    context.fillText(point.label, point.xPx + 11, point.yPx);
+  });
 
   context.restore();
 }

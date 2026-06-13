@@ -2,6 +2,8 @@ import { PointerEventHandler, RefObject } from "react";
 import { ImageTransform, ZOOM_MAX, ZOOM_MIN } from "../core/geometry";
 import { PHOTO_FORMAT } from "../core/photo-format";
 import { PhotoItem } from "../core/photo-project";
+import { FaceLandmarkerModelStatus } from "../vision/face-landmarker";
+import { FaceDetectionPanel } from "./FaceDetectionPanel";
 
 type PhotoEditorProps = {
   photo: PhotoItem | null;
@@ -15,6 +17,13 @@ type PhotoEditorProps = {
   onGuideOpacityChange: (opacity: number) => void;
   onResetPhoto: () => void;
   onExportPhoto: () => void;
+  faceModelStatus: FaceLandmarkerModelStatus;
+  faceModelError: string;
+  onLoadFaceModel: () => void;
+  onDetectFace: () => void;
+  onManualAssistantChange: (enabled: boolean) => void;
+  onApplyManualFacePlacement: () => void;
+  onResetManualFacePoints: () => void;
 };
 
 export function PhotoEditor({
@@ -29,6 +38,13 @@ export function PhotoEditor({
   onGuideOpacityChange,
   onResetPhoto,
   onExportPhoto,
+  faceModelStatus,
+  faceModelError,
+  onLoadFaceModel,
+  onDetectFace,
+  onManualAssistantChange,
+  onApplyManualFacePlacement,
+  onResetManualFacePoints,
 }: PhotoEditorProps) {
   const editState = photo?.editState;
   const transform = editState?.transform;
@@ -114,6 +130,17 @@ export function PhotoEditor({
             du menton au sommet du crane, hors cheveux.
           </p>
         </fieldset>
+
+        <FaceDetectionPanel
+          photo={photo}
+          modelStatus={faceModelStatus}
+          modelError={faceModelError}
+          onLoadModel={onLoadFaceModel}
+          onDetectFace={onDetectFace}
+          onManualAssistantChange={onManualAssistantChange}
+          onApplyManualFacePlacement={onApplyManualFacePlacement}
+          onResetManualFacePoints={onResetManualFacePoints}
+        />
 
         <label className="slider-control">
           <span>Rotation</span>
