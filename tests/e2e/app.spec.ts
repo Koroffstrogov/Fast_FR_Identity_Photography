@@ -20,6 +20,10 @@ test("loads multiple local images, edits the active photo, and previews a multi-
   await expect(sheetCanvas).toHaveAttribute("width", "2480");
   await expect(sheetCanvas).toHaveAttribute("height", "3508");
 
+  const finalPreviewCanvas = page.getByLabel("Apercu photo finale 35 par 45 millimetres");
+  await expect(finalPreviewCanvas).toHaveAttribute("width", "413");
+  await expect(finalPreviewCanvas).toHaveAttribute("height", "531");
+
   const requestsAfterLoad: string[] = [];
   page.on("request", (request) => {
     const url = new URL(request.url());
@@ -65,8 +69,15 @@ test("loads multiple local images, edits the active photo, and previews a multi-
   await expect(page.getByText("Total demande : 10 / 30 places.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Export planche A4" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Imprimer A4" })).toBeEnabled();
-  await expect(page.getByRole("button", { name: "Exporter toutes les photos" })).toBeEnabled();
-  await expect(page.getByRole("button", { name: "Exporter ZIP" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Exporter toutes les photos en ZIP" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Telecharger separement" })).toBeEnabled();
+  await expect(page.getByRole("heading", { name: "Photo finale 35x45" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Apercu planche A4" })).toBeVisible();
+
+  await page.locator('input[name="sheet-mode"][value="comfort"]').check({ force: true });
+  await expect(page.getByText("Total demande : 10 / 25 places.")).toBeVisible();
+  await page.locator('input[name="sheet-mode"][value="standard"]').check({ force: true });
+  await expect(page.getByText("Total demande : 10 / 30 places.")).toBeVisible();
 
   await page.getByRole("button", { name: "Choisir bob.png" }).click();
   await expect(page.getByRole("heading", { name: "Éléa Sport" })).toBeVisible();

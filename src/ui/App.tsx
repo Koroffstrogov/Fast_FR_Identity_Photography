@@ -13,7 +13,6 @@ import {
   zoomTransformAtPoint,
 } from "../core/geometry";
 import {
-  FILE_NAMING_TEMPLATES,
   FileNamingTemplateId,
   buildDisplayNameFromPersonName,
   buildSheetFileName,
@@ -28,12 +27,7 @@ import {
   removePhotoItem,
   updatePhotoItem,
 } from "../core/photo-project";
-import {
-  A4_PRINT_PAGE,
-  PRINT_LAYOUTS,
-  PrintLayoutMode,
-  getSheetCapacity,
-} from "../core/print-layout";
+import { PrintLayoutMode, getSheetCapacity } from "../core/print-layout";
 import { buildSheetComposition } from "../core/sheet-items";
 import {
   ImageImportError,
@@ -46,8 +40,11 @@ import {
 } from "../export/export-batch";
 import { createPhotosZip, downloadZip } from "../export/export-zip";
 import { openA4PrintPage } from "../print/open-print-page";
+import { ExportPanel } from "./ExportPanel";
+import { FinalPhotoPreview } from "./FinalPhotoPreview";
 import { PhotoEditor } from "./PhotoEditor";
 import { PhotoList } from "./PhotoList";
+import { SheetPreview } from "./SheetPreview";
 
 type DragState = {
   pointerId: number;
@@ -511,135 +508,42 @@ export function App() {
             onRemovePhoto={handleRemovePhoto}
           />
 
-          <PhotoEditor
-            photo={activePhoto}
-            photoCanvasRef={photoCanvasRef}
-            guideCanvasRef={guideCanvasRef}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerEnd={handlePointerEnd}
-            onTransformChange={handleTransformChange}
-            onGuideVisibilityChange={handleGuideVisibilityChange}
-            onGuideOpacityChange={handleGuideOpacityChange}
-            onResetPhoto={handleResetActivePhoto}
-            onExportPhoto={handleExportPhoto}
+          <div className="photo-workflow">
+            <PhotoEditor
+              photo={activePhoto}
+              photoCanvasRef={photoCanvasRef}
+              guideCanvasRef={guideCanvasRef}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerEnd={handlePointerEnd}
+              onTransformChange={handleTransformChange}
+              onGuideVisibilityChange={handleGuideVisibilityChange}
+              onGuideOpacityChange={handleGuideOpacityChange}
+              onResetPhoto={handleResetActivePhoto}
+              onExportPhoto={handleExportPhoto}
+            />
+            <FinalPhotoPreview photo={activePhoto} />
+          </div>
+
+          <ExportPanel
+            photoCount={photos.length}
+            fileNamingTemplate={fileNamingTemplate}
+            sheetMode={sheetMode}
+            composition={sheetComposition}
+            onFileNamingTemplateChange={setFileNamingTemplate}
+            onSheetModeChange={setSheetMode}
+            onSheetExport={handleSheetExport}
+            onPrintSheet={handlePrintSheet}
+            onZipExport={handleZipExport}
+            onSeparateExport={handleBatchExport}
           />
-
-          <form className="controls sheet-controls" onSubmit={(event) => event.preventDefault()}>
-            <fieldset className="mode-control">
-              <legend>Nommage exports</legend>
-              <label className="select-control">
-                <span>Modele</span>
-                <select
-                  aria-label="Modele de nommage"
-                  value={fileNamingTemplate}
-                  onChange={(event) =>
-                    setFileNamingTemplate(event.currentTarget.value as FileNamingTemplateId)
-                  }
-                >
-                  {Object.entries(FILE_NAMING_TEMPLATES).map(([templateId, template]) => (
-                    <option key={templateId} value={templateId}>
-                      {template.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </fieldset>
-
-            <fieldset className="mode-control">
-              <legend>Planche A4</legend>
-              <div className="segmented-options">
-                {(["standard", "comfort"] as const).map((mode) => (
-                  <label key={mode}>
-                    <input
-                      type="radio"
-                      name="sheet-mode"
-                      value={mode}
-                      checked={sheetMode === mode}
-                      onChange={() => setSheetMode(mode)}
-                    />
-                    <span>
-                      {mode === "standard" ? "Standard" : "Confort"}
-                      <small>{PRINT_LAYOUTS[mode].photos} photos</small>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-
-            <p className="sheet-total">
-              Total demande : {sheetComposition.requestedCount} / {sheetComposition.capacity} places.
-            </p>
-
-            {sheetComposition.isLimited && (
-              <p className="warning" role="alert">
-                Le total depasse la capacite. L'export sera limite aux{" "}
-                {sheetComposition.capacity} premieres photos.
-              </p>
-            )}
-
-            <p className="print-note">
-              Impression a 100 %, sans ajustement a la page. Verifiez la regle
-              10 cm en bas de la planche.
-            </p>
-
-            <div className="button-row">
-              <button
-                type="button"
-                onClick={handleSheetExport}
-                disabled={photos.length === 0}
-              >
-                Export planche A4
-              </button>
-              <button
-                type="button"
-                onClick={handlePrintSheet}
-                disabled={photos.length === 0}
-              >
-                Imprimer A4
-              </button>
-            </div>
-
-            <div className="button-row">
-              <button
-                type="button"
-                onClick={handleBatchExport}
-                disabled={photos.length === 0}
-              >
-                Exporter toutes les photos
-              </button>
-              <button
-                type="button"
-                onClick={handleZipExport}
-                disabled={photos.length === 0}
-              >
-                Exporter ZIP
-              </button>
-            </div>
-          </form>
         </div>
 
-        <section className="sheet-section" aria-labelledby="sheet-title">
-          <div className="sheet-copy">
-            <p className="eyebrow">Planche imprimable</p>
-            <h2 id="sheet-title">Apercu A4</h2>
-            <p>
-              Page {A4_PRINT_PAGE.widthMm} x {A4_PRINT_PAGE.heightMm} mm a{" "}
-              {A4_PRINT_PAGE.dpi} dpi, marge {A4_PRINT_PAGE.marginMm} mm, mode{" "}
-              {sheetMode === "standard" ? "standard" : "confort"} :{" "}
-              {sheetComposition.renderedCount} photo(s) rendue(s).
-            </p>
-          </div>
-          <div className="sheet-preview-panel">
-            <canvas
-              ref={sheetCanvasRef}
-              width={A4_PRINT_PAGE.widthPx}
-              height={A4_PRINT_PAGE.heightPx}
-              className="sheet-canvas"
-              aria-label="Apercu planche A4 imprimable"
-            />
-          </div>
-        </section>
+        <SheetPreview
+          canvasRef={sheetCanvasRef}
+          sheetMode={sheetMode}
+          composition={sheetComposition}
+        />
       </section>
     </main>
   );

@@ -1,4 +1,5 @@
 import { PhotoItem, PhotoUsage } from "../core/photo-project";
+import { PhotoThumbnail } from "./PhotoThumbnail";
 
 const PHOTO_USAGE_LABELS: Record<PhotoUsage, string> = {
   college: "College",
@@ -48,6 +49,7 @@ export function PhotoList({
 
             return (
               <li key={photo.id} className={isActive ? "photo-list-item is-active" : "photo-list-item"}>
+                <PhotoThumbnail photo={photo} />
                 <button
                   type="button"
                   className="photo-select-button"
