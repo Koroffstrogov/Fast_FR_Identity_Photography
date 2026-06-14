@@ -5,8 +5,8 @@ d'identite 35 x 45 mm pour usages non officiels : college, sport, badge,
 association.
 
 L'application tourne dans le navigateur sur PC. Les photos restent locales :
-aucune photo n'est envoyee a un serveur, aucun tracking n'est ajoute, et les
-modeles IA sont servis depuis `public/models`.
+aucune photo n'est envoyee a un serveur, aucun tracking n'est ajoute, les assets
+IA sont servis localement et le modele lourd RMBG-2.0 reste hors du build.
 
 ## Fonctionnalites
 
@@ -115,26 +115,40 @@ comme fichiers statiques au runtime ; ils ne doivent jamais etre importes depuis
 L'application demarre sans modele IA, mais les fonctions de detection visage et
 de suppression de fond exigent des fichiers locaux.
 
-Pour la suppression du fond RMBG-2.0, placer le modele ici :
+Pour la suppression du fond RMBG-2.0 en developpement, placer le modele ici :
 
 ```text
-public/models/rmbg2/model.onnx
+local-models/rmbg2/model.onnx
 ```
 
 Creer le dossier si besoin :
 
 ```powershell
-New-Item -ItemType Directory -Force public/models/rmbg2
+New-Item -ItemType Directory -Force local-models/rmbg2
 ```
 
 Le fichier `model.onnx` n'est pas fourni, n'est pas telecharge automatiquement
-et est ignore par Git. Apres copie, verifier qu'il existe et qu'il ne s'agit pas
-d'un fichier HTML ou vide :
+et est ignore par Git. Il ne doit pas etre place dans `public/`, sinon Vite le
+copiera dans `dist/` pendant `npm run build`. En developpement, un middleware
+Vite sert automatiquement ce fichier local sous l'URL attendue par
+l'application :
+
+```text
+/models/rmbg2/model.onnx
+```
+
+Apres copie, verifier qu'il existe et qu'il ne s'agit pas d'un fichier HTML ou
+vide :
 
 ```powershell
-Get-Item public/models/rmbg2/model.onnx
-Format-Hex public/models/rmbg2/model.onnx -Count 32
+Get-Item local-models/rmbg2/model.onnx
+Format-Hex local-models/rmbg2/model.onnx -Count 32
 ```
+
+Pour un deploiement statique, `local-models/` n'est pas inclus dans le build.
+Il faut donc fournir vous-meme le modele a l'URL `/models/rmbg2/model.onnx` sur
+le serveur statique final, ou adapter la configuration `modelPath` si vous
+hebergez le modele a une autre URL.
 
 Pour la detection visage, le modele MediaPipe est documente plus bas dans
 `Configuration des modeles locaux`.
@@ -165,8 +179,8 @@ aident a diagnostiquer un probleme de modele :
 - `Octets modele` : doit etre largement superieur a 1024.
 
 Si le modele renvoie `text/html`, le navigateur recoit l'application Vite au
-lieu du fichier ONNX. Verifier alors le port ouvert et la presence du modele dans
-le `public/` du projet servi.
+lieu du fichier ONNX. Verifier alors le port ouvert, le middleware Vite et la
+presence du modele dans `local-models/rmbg2/model.onnx`.
 
 ### 7. Construire et previsualiser le build
 
@@ -183,7 +197,8 @@ npm run preview
 ```
 
 Le build doit rester utilisable hors ligne apres chargement initial, a condition
-que les modeles locaux et les assets runtime soient presents.
+que les assets runtime soient presents et que le serveur statique fournisse les
+modeles attendus. Le dossier `local-models/` n'est pas copie dans `dist/`.
 
 ## Configuration des modeles locaux
 
@@ -216,17 +231,28 @@ L'inference se fait localement dans le navigateur depuis un modele ONNX.
 
 Assets attendus :
 
-- modele : `public/models/rmbg2/model.onnx`
+- modele en developpement : `local-models/rmbg2/model.onnx`
+- URL servie par Vite en developpement : `/models/rmbg2/model.onnx`
 - runtime ONNX : `public/ort/`
 
 Le modele `model.onnx` n'est pas telecharge automatiquement et n'est pas
 committe. Placez-le manuellement :
 
 ```powershell
-New-Item -ItemType Directory -Force public/models/rmbg2
+New-Item -ItemType Directory -Force local-models/rmbg2
 # Copier ensuite votre fichier RMBG-2.0 ONNX ici :
-# public/models/rmbg2/model.onnx
+# local-models/rmbg2/model.onnx
 ```
+
+`local-models/` est ignore par Git et n'est pas copie dans `dist/`. Cela evite
+de committer ou de recopier le modele d'environ 1 Go pendant le build Vite. En
+developpement, le middleware Vite expose ce fichier sous
+`/models/rmbg2/model.onnx`.
+
+Pour un deploiement statique, vous devez fournir le modele vous-meme a l'URL
+`/models/rmbg2/model.onnx`, ou configurer une autre URL de modele dans
+`src/background/rmbg2-config.ts` avant build. Le depot ne telecharge pas le
+modele et n'utilise pas Git LFS.
 
 BRIA RMBG-2.0 est soumis à licence. Vérifier les conditions d’usage, notamment
 commercial, avant utilisation réelle.
@@ -295,7 +321,7 @@ npm run test:e2e
 
 Les tests unitaires ne dependent pas de la presence du modele RMBG-2.0 lourd.
 Le test avec modele reel est optionnel et se skippe automatiquement si
-`public/models/rmbg2/model.onnx` est absent.
+`local-models/rmbg2/model.onnx` est absent.
 
 ## Architecture
 
@@ -327,7 +353,8 @@ Verifier :
 
 Verifier :
 
-- `public/models/rmbg2/model.onnx` existe ;
+- `local-models/rmbg2/model.onnx` existe en developpement ;
+- l'URL `/models/rmbg2/model.onnx` ne renvoie pas `text/html` ;
 - le fichier n'est pas une page HTML ou un placeholder ;
 - le modele respecte un export ONNX compatible avec ONNX Runtime Web.
 

@@ -7,4 +7,13 @@ playwright-report/
 *.local
 public/models/mediapipe/*.task
 public/models/mediapipe/*.tflite
+
+# Local AI models - do not commit
+/local-models/
 public/models/rmbg2/*.onnx
+public/models/rmbg2/*.ort
+public/models/rmbg2/*.bin
+public/models/rmbg2/*.data
+public/models/rmbg2/*.safetensors
+public/models/rmbg2/*.pth
+public/models/rmbg2/*.pt

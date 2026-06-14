@@ -9,6 +9,7 @@ import { BackgroundRemovalStatus } from "../background/background-removal";
 import {
   RMBG2_DEFAULT_CONFIG,
   RMBG2_ENGINE_LABEL,
+  RMBG2_LOCAL_MODEL_PATH,
 } from "../background/rmbg2-config";
 
 export type BackgroundPointMode = "none" | "foreground" | "background";
@@ -283,6 +284,7 @@ export function BackgroundPanel({
         <p>Assets WASM : {diagnostics?.ortWasmPath ?? "/ort/"}</p>
         <p>Origin courant : {diagnostics?.currentOrigin ?? browserOrigin ?? "-"}</p>
         <p>Modele : {diagnostics?.modelPath ?? RMBG2_DEFAULT_CONFIG.modelPath}</p>
+        <p>Fichier local dev : {RMBG2_LOCAL_MODEL_PATH}</p>
         <p>URL testee : {diagnostics?.modelUrl ?? fallbackModelUrl}</p>
         <p>HTTP modele : {diagnostics?.modelHttpStatus ?? "-"}</p>
         <p>Content-Type modele : {diagnostics?.modelContentType ?? "-"}</p>

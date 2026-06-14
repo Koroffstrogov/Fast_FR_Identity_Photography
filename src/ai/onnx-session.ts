@@ -16,6 +16,7 @@ import {
 } from "./runtime-capabilities";
 import {
   RMBG2_DEFAULT_CONFIG,
+  RMBG2_LOCAL_MODEL_PATH,
   RMBG2_MODEL_DIRECTORY,
   Rmbg2ModelConfig,
 } from "../background/rmbg2-config";
@@ -144,7 +145,7 @@ export async function loadLocalOnnxModel(
 
   if (!response.ok) {
     throw new Error(
-      `Modele RMBG-2.0 introuvable dans ${RMBG2_MODEL_DIRECTORY}. Fichier attendu : ${modelPath}. URL testee : ${probe.requestedUrl} (HTTP ${response.status}).`,
+      `Modele RMBG-2.0 introuvable dans ${RMBG2_MODEL_DIRECTORY}. En developpement, placez le fichier dans ${RMBG2_LOCAL_MODEL_PATH}. URL testee : ${probe.requestedUrl} (HTTP ${response.status}).`,
     );
   }
 
@@ -158,7 +159,8 @@ export async function loadLocalOnnxModel(
     throw new Error(
       [
         "Le chemin du modele renvoie l'application HTML.",
-        "Verifiez le port, le dossier public et la presence du fichier.",
+        `Verifiez le port, le middleware Vite et la presence du fichier ${RMBG2_LOCAL_MODEL_PATH}.`,
+        "En build statique, fournissez vous-meme le modele a l'URL attendue.",
         `Origin courant : ${probe.currentOrigin ?? "inconnu"}.`,
         `URL testee : ${probe.requestedUrl}.`,
         `Content-Type : ${probe.contentType || "inconnu"}.`,

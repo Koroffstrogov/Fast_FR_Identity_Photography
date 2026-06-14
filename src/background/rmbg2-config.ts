@@ -24,5 +24,6 @@ export const RMBG2_DEFAULT_CONFIG: Rmbg2ModelConfig = {
   },
 };
 
-export const RMBG2_MODEL_DIRECTORY = "public/models/rmbg2/";
+export const RMBG2_MODEL_DIRECTORY = "local-models/rmbg2/";
+export const RMBG2_LOCAL_MODEL_PATH = "local-models/rmbg2/model.onnx";
 export const RMBG2_ENGINE_LABEL = "RMBG-2.0";
