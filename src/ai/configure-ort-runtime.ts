@@ -3,7 +3,7 @@ import * as ort from "onnxruntime-web/webgpu";
 export type OnnxRuntimeApi = {
   env: {
     wasm: {
-      wasmPaths?: string | URL | { wasm?: string | URL; mjs?: string | URL };
+      wasmPaths?: OnnxWasmPaths;
       numThreads?: number;
     };
   };
@@ -31,6 +31,15 @@ export type OnnxTensorLike = {
   readonly data: unknown;
   readonly dims: readonly number[];
 };
+
+export type OnnxWasmPaths =
+  | string
+  | URL
+  | {
+      wasm?: string | URL;
+      mjs?: string | URL;
+      [fileName: string]: string | URL | undefined;
+    };
 
 export const ORT_WASM_ASSET_PATHS = {
   wasm: "/ort/ort-wasm-simd-threaded.asyncify.wasm",

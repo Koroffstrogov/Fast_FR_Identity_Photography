@@ -7,6 +7,7 @@ playwright-report/
 *.local
 public/models/mediapipe/*.task
 public/models/mediapipe/*.tflite
+.venv-onnx
 
 # Local AI models - do not commit
 /local-models/

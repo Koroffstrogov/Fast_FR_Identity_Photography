@@ -1,8 +1,8 @@
-import * as ort from "onnxruntime-web/webgpu";
 import {
   BackgroundRemovalBackendPreference,
   BackgroundTechnicalDiagnostics,
 } from "../core/photo-project";
+import { getOrtRuntime } from "../ai/configure-ort-runtime";
 import {
   OnnxRuntimeApi,
   OnnxSessionLike,
@@ -39,7 +39,7 @@ export class Rmbg2BackgroundRemovalRunner implements BackgroundRemovalRunner {
 
   constructor({
     config = RMBG2_DEFAULT_CONFIG,
-    runtime = ort as unknown as OnnxRuntimeApi,
+    runtime = getOrtRuntime(),
     now = defaultNow,
   }: Rmbg2RunnerOptions = {}) {
     this.config = config;

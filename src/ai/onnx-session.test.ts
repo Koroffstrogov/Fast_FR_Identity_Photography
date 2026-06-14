@@ -23,6 +23,10 @@ describe("ONNX session setup", () => {
     });
 
     expect(runtime.env.wasm.wasmPaths).toEqual(ORT_WASM_ASSET_PATHS);
+    expect(runtime.env.wasm.wasmPaths).toMatchObject({
+      wasm: "/ort/ort-wasm-simd-threaded.asyncify.wasm",
+    });
+    expect(runtime.env.wasm.wasmPaths).not.toHaveProperty("mjs");
     expect(runtime.env.wasm.numThreads).toBe(1);
     expect(runtime.InferenceSession.create).toHaveBeenCalledWith(
       expect.any(Uint8Array),

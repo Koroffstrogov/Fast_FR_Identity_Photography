@@ -82,6 +82,7 @@ export async function createConfiguredOnnxSession({
     const startedAt = now();
 
     try {
+      logOrtRuntimeConfig(runtime);
       const session = await runtime.InferenceSession.create(loadedModel.bytes, {
         executionProviders: [attempt.provider],
         graphOptimizationLevel: "all",
@@ -278,4 +279,17 @@ function formatUnknownError(error: unknown): string {
 
 function defaultNow(): number {
   return typeof performance === "undefined" ? Date.now() : performance.now();
+}
+
+function logOrtRuntimeConfig(runtime: OnnxRuntimeApi): void {
+  if (!isDevelopmentRuntime()) {
+    return;
+  }
+
+  console.log("ORT wasmPaths before create:", runtime.env.wasm.wasmPaths);
+  console.log("ORT numThreads before create:", runtime.env.wasm.numThreads);
+}
+
+function isDevelopmentRuntime(): boolean {
+  return Boolean(import.meta.env?.DEV);
 }
