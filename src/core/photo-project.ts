@@ -39,6 +39,12 @@ export type BackgroundTechnicalDiagnostics = {
   activeBackend: BackgroundRemovalActiveBackend;
   provider: string;
   modelPath: string;
+  currentOrigin?: string;
+  modelUrl?: string;
+  modelHttpStatus?: number;
+  modelContentType?: string;
+  modelContentLength?: string | null;
+  modelBytes?: number;
   ortWasmPath: string;
   inputWidth: number;
   inputHeight: number;

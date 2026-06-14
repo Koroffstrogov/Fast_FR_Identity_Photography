@@ -1,4 +1,4 @@
-import { FaceLandmarkerModelStatus } from "../vision/face-landmarker";
+import type { FaceLandmarkerModelStatus } from "../vision/face-landmarker";
 import { PhotoItem, hasAllFacePoints } from "../core/photo-project";
 
 type FaceDetectionPanelProps = {

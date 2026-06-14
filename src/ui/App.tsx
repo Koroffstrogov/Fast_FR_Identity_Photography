@@ -67,12 +67,7 @@ import { RightInspector } from "./RightInspector";
 import { TopBar } from "./TopBar";
 import { Workspace } from "./Workspace";
 import { AppMode } from "./app-mode";
-import {
-  FaceLandmarkerModelStatus,
-  detectFaceLandmarks,
-  getFaceLandmarkerErrorMessage,
-  loadFaceLandmarker,
-} from "../vision/face-landmarker";
+import type { FaceLandmarkerModelStatus } from "../vision/face-landmarker";
 import {
   BackgroundRemovalStatus,
   getBackgroundRemovalErrorMessage,
@@ -466,10 +461,14 @@ export function App() {
     setFaceModelError("");
 
     try {
+      const { loadFaceLandmarker } = await import("../vision/face-landmarker");
       await loadFaceLandmarker();
       setFaceModelStatus("ready");
       return null;
     } catch (loadError) {
+      const { getFaceLandmarkerErrorMessage } = await import(
+        "../vision/face-landmarker"
+      );
       const message =
         loadError instanceof Error
           ? loadError.message
@@ -518,6 +517,7 @@ export function App() {
     }
 
     try {
+      const { detectFaceLandmarks } = await import("../vision/face-landmarker");
       const detectionResult = await detectFaceLandmarks(photo.image);
       const analysis = analyzeFaceLandmarks(detectionResult.faceLandmarks);
 

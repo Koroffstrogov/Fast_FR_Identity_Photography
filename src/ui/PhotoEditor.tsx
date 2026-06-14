@@ -3,7 +3,7 @@ import { ImageTransform, ZOOM_MAX, ZOOM_MIN } from "../core/geometry";
 import { PHOTO_FORMAT } from "../core/photo-format";
 import { PhotoItem } from "../core/photo-project";
 import { BackgroundRemovalStatus } from "../background/background-removal";
-import { FaceLandmarkerModelStatus } from "../vision/face-landmarker";
+import type { FaceLandmarkerModelStatus } from "../vision/face-landmarker";
 import { BackgroundPanel, BackgroundPointMode } from "./BackgroundPanel";
 import { FaceDetectionPanel } from "./FaceDetectionPanel";
 

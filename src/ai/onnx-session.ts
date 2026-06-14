@@ -51,6 +51,22 @@ export type CreatedOnnxSession = {
   diagnostics: BackgroundTechnicalDiagnostics;
 };
 
+export type OnnxModelProbe = {
+  requestedPath: string;
+  requestedUrl: string;
+  currentOrigin?: string;
+  status?: number;
+  contentType?: string;
+  contentLength?: string | null;
+  byteLength?: number;
+  headText?: string;
+};
+
+export type LoadedOnnxModel = {
+  bytes: Uint8Array;
+  probe: OnnxModelProbe;
+};
+
 export type CreateOnnxSessionOptions = {
   backendPreference: BackgroundRemovalBackendPreference;
   config?: Rmbg2ModelConfig;
@@ -79,14 +95,17 @@ export async function createConfiguredOnnxSession({
     throw new Error(resolution.error);
   }
 
-  const bytes = modelBytes ?? (await loadLocalOnnxModel(config.modelPath, fetchModel));
+  const loadedModel =
+    modelBytes !== undefined
+      ? createLoadedModelFromBytes(config.modelPath, modelBytes)
+      : await loadLocalOnnxModel(config.modelPath, fetchModel);
   const errors: string[] = [];
 
   for (const attempt of resolution.attempts) {
     const startedAt = now();
 
     try {
-      const session = await runtime.InferenceSession.create(bytes, {
+      const session = await runtime.InferenceSession.create(loadedModel.bytes, {
         executionProviders: [attempt.provider],
         graphOptimizationLevel: "all",
       });
@@ -101,6 +120,12 @@ export async function createConfiguredOnnxSession({
           activeBackend: attempt.activeBackend,
           provider: attempt.provider,
           modelPath: config.modelPath,
+          currentOrigin: loadedModel.probe.currentOrigin,
+          modelUrl: loadedModel.probe.requestedUrl,
+          modelHttpStatus: loadedModel.probe.status,
+          modelContentType: loadedModel.probe.contentType,
+          modelContentLength: loadedModel.probe.contentLength,
+          modelBytes: loadedModel.probe.byteLength,
           ortWasmPath: config.ortWasmPath,
           inputWidth: config.inputWidth,
           inputHeight: config.inputHeight,
@@ -133,29 +158,43 @@ export function configureOnnxRuntimeAssets(
 export async function loadLocalOnnxModel(
   modelPath: string,
   fetchModel: typeof fetch = fetch,
-): Promise<Uint8Array> {
+): Promise<LoadedOnnxModel> {
+  const probe = createModelProbe(modelPath);
   let response: Response;
 
   try {
-    response = await fetchModel(modelPath, { cache: "no-store" });
+    response = await fetchModel(probe.requestedUrl, { cache: "no-store" });
   } catch (error) {
     throw new Error(
-      `Modele RMBG-2.0 inaccessible : ${modelPath}. ${formatUnknownError(error)}`,
+      `Modele RMBG-2.0 inaccessible : ${modelPath}. URL testee : ${probe.requestedUrl}. ${formatUnknownError(error)}`,
     );
   }
+
+  probe.status = response.status;
+  probe.contentType = response.headers.get("content-type") ?? "";
+  probe.contentLength = response.headers.get("content-length");
 
   if (!response.ok) {
     throw new Error(
-      `Modele RMBG-2.0 introuvable dans ${RMBG2_MODEL_DIRECTORY}. Fichier attendu : ${modelPath} (HTTP ${response.status}).`,
+      `Modele RMBG-2.0 introuvable dans ${RMBG2_MODEL_DIRECTORY}. Fichier attendu : ${modelPath}. URL testee : ${probe.requestedUrl} (HTTP ${response.status}).`,
     );
   }
 
-  const contentType = response.headers.get("content-type") ?? "";
   const modelBytes = new Uint8Array(await response.arrayBuffer());
+  probe.byteLength = modelBytes.byteLength;
+  probe.headText = new TextDecoder()
+    .decode(modelBytes.slice(0, Math.min(modelBytes.byteLength, 160)))
+    .trimStart();
 
-  if (contentType.includes("text/html") || looksLikeHtml(modelBytes)) {
+  if (probe.contentType.includes("text/html") || looksLikeHtml(modelBytes)) {
     throw new Error(
-      `Modele RMBG-2.0 incompatible : ${modelPath} renvoie une page HTML au lieu d'un fichier .onnx.`,
+      [
+        "Le chemin du modele renvoie l'application HTML.",
+        "Verifiez le port, le dossier public et la presence du fichier.",
+        `Origin courant : ${probe.currentOrigin ?? "inconnu"}.`,
+        `URL testee : ${probe.requestedUrl}.`,
+        `Content-Type : ${probe.contentType || "inconnu"}.`,
+      ].join(" "),
     );
   }
 
@@ -165,7 +204,60 @@ export async function loadLocalOnnxModel(
     );
   }
 
-  return modelBytes;
+  return {
+    bytes: modelBytes,
+    probe,
+  };
+}
+
+export function createModelProbe(modelPath: string, now = Date.now): OnnxModelProbe {
+  const currentOrigin = getCurrentOrigin();
+  const requestedUrl = createModelUrl(modelPath, currentOrigin, now());
+
+  return {
+    requestedPath: modelPath,
+    requestedUrl,
+    currentOrigin,
+  };
+}
+
+function createLoadedModelFromBytes(
+  modelPath: string,
+  bytes: Uint8Array,
+): LoadedOnnxModel {
+  const probe = createModelProbe(modelPath, () => 0);
+
+  return {
+    bytes,
+    probe: {
+      ...probe,
+      byteLength: bytes.byteLength,
+    },
+  };
+}
+
+function createModelUrl(
+  modelPath: string,
+  currentOrigin: string | undefined,
+  cacheBust: number,
+): string {
+  const base = currentOrigin || "http://localhost";
+  const url = new URL(modelPath, base);
+  url.searchParams.set("cacheBust", String(cacheBust));
+
+  if (!currentOrigin && modelPath.startsWith("/")) {
+    return `${modelPath}${url.search}`;
+  }
+
+  return url.toString();
+}
+
+function getCurrentOrigin(): string | undefined {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  return window.location.origin;
 }
 
 function getFallbackMessage(

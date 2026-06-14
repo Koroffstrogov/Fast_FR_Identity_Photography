@@ -6,7 +6,10 @@ import {
 } from "../core/photo-project";
 import { getRuntimeCapabilities } from "../ai/runtime-capabilities";
 import { BackgroundRemovalStatus } from "../background/background-removal";
-import { RMBG2_ENGINE_LABEL } from "../background/rmbg2-config";
+import {
+  RMBG2_DEFAULT_CONFIG,
+  RMBG2_ENGINE_LABEL,
+} from "../background/rmbg2-config";
 
 export type BackgroundPointMode = "none" | "foreground" | "background";
 
@@ -42,6 +45,8 @@ export function BackgroundPanel({
   const pointCount =
     edit.manualForegroundPoints.length + edit.manualBackgroundPoints.length;
   const diagnostics = edit.technicalDiagnostics;
+  const browserOrigin = getBrowserOrigin();
+  const fallbackModelUrl = getModelUrlForOrigin(browserOrigin);
   const navigatorGpuAvailable =
     diagnostics?.navigatorGpuAvailable ?? getRuntimeCapabilities().navigatorGpuAvailable;
 
@@ -276,7 +281,12 @@ export function BackgroundPanel({
         <p>Input detecte : {diagnostics?.selectedInputName ?? diagnostics?.inputNames.join(", ") ?? "-"}</p>
         <p>Output detecte : {diagnostics?.selectedOutputName ?? diagnostics?.outputNames.join(", ") ?? "-"}</p>
         <p>Assets WASM : {diagnostics?.ortWasmPath ?? "/ort/"}</p>
-        <p>Modele : {diagnostics?.modelPath ?? "/models/rmbg2/model.onnx"}</p>
+        <p>Origin courant : {diagnostics?.currentOrigin ?? browserOrigin ?? "-"}</p>
+        <p>Modele : {diagnostics?.modelPath ?? RMBG2_DEFAULT_CONFIG.modelPath}</p>
+        <p>URL testee : {diagnostics?.modelUrl ?? fallbackModelUrl}</p>
+        <p>HTTP modele : {diagnostics?.modelHttpStatus ?? "-"}</p>
+        <p>Content-Type modele : {diagnostics?.modelContentType ?? "-"}</p>
+        <p>Octets modele : {diagnostics?.modelBytes ?? "-"}</p>
         {diagnostics?.fallbackMessage && (
           <p className="warning">{diagnostics.fallbackMessage}</p>
         )}
@@ -386,4 +396,20 @@ function getActiveBackendLabel(activeBackend: BackgroundEditState["activeBackend
 
 function formatMs(value: number | undefined): string {
   return typeof value === "number" ? `${value} ms` : "-";
+}
+
+function getBrowserOrigin(): string | undefined {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  return window.location.origin;
+}
+
+function getModelUrlForOrigin(origin: string | undefined): string {
+  if (!origin) {
+    return RMBG2_DEFAULT_CONFIG.modelPath;
+  }
+
+  return new URL(RMBG2_DEFAULT_CONFIG.modelPath, origin).toString();
 }

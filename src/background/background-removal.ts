@@ -6,11 +6,10 @@ import {
   BackgroundRemovalResult,
   BackgroundRemovalRunner,
 } from "./background-removal-runner";
-import { Rmbg2BackgroundRemovalRunner } from "./rmbg2-runner";
 
 export type BackgroundRemovalStatus = "idle" | "loading" | "ready" | "error";
 
-let runner: BackgroundRemovalRunner = new Rmbg2BackgroundRemovalRunner();
+let runner: BackgroundRemovalRunner | null = null;
 let status: BackgroundRemovalStatus = "idle";
 
 export function getBackgroundRemovalStatus(): BackgroundRemovalStatus {
@@ -23,7 +22,9 @@ export async function loadBackgroundRemovalModel(
   status = "loading";
 
   try {
-    const diagnostics = await runner.load(backendPreference);
+    const diagnostics = await (await getBackgroundRemovalRunner()).load(
+      backendPreference,
+    );
     status = "ready";
     return diagnostics;
   } catch (error) {
@@ -39,7 +40,10 @@ export async function removeImageBackground(
   status = "loading";
 
   try {
-    const result = await runner.removeBackground(image, backendPreference);
+    const result = await (await getBackgroundRemovalRunner()).removeBackground(
+      image,
+      backendPreference,
+    );
     status = "ready";
     return result;
   } catch (error) {
@@ -55,6 +59,7 @@ export function getBackgroundRemovalErrorMessage(error: unknown): string {
     detail.startsWith("Modele RMBG-2.0") ||
     detail.startsWith(".wasm ONNX") ||
     detail.startsWith("WebGPU") ||
+    detail.startsWith("Le chemin du modele renvoie l'application HTML") ||
     detail.startsWith("Sortie modele RMBG-2.0") ||
     detail.startsWith("Shape de sortie RMBG-2.0")
   ) {
@@ -69,4 +74,15 @@ export function setBackgroundRemovalRunnerForTests(
 ): void {
   runner = nextRunner;
   status = "idle";
+}
+
+async function getBackgroundRemovalRunner(): Promise<BackgroundRemovalRunner> {
+  if (runner) {
+    return runner;
+  }
+
+  const { Rmbg2BackgroundRemovalRunner } = await import("./rmbg2-runner");
+  runner = new Rmbg2BackgroundRemovalRunner();
+
+  return runner;
 }

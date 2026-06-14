@@ -4,7 +4,7 @@ import { PRINT_LAYOUTS, PrintLayoutMode } from "../core/print-layout";
 import { SheetComposition } from "../core/sheet-items";
 import { QualityEditState } from "../quality/quality-state";
 import { BackgroundRemovalStatus } from "../background/background-removal";
-import { FaceLandmarkerModelStatus } from "../vision/face-landmarker";
+import type { FaceLandmarkerModelStatus } from "../vision/face-landmarker";
 import { BackgroundPanel, BackgroundPointMode } from "./BackgroundPanel";
 import { ExportPanel } from "./ExportPanel";
 import { FaceDetectionPanel } from "./FaceDetectionPanel";

@@ -155,7 +155,7 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   await page.getByRole("button", { name: "Fond", exact: true }).click();
   await expect(canvas).toBeVisible();
   const backgroundGroup = page.getByRole("group", { name: "Fond" });
-  await page.route("**/models/rmbg2/model.onnx", async (route) => {
+  await page.route("**/models/rmbg2/model.onnx**", async (route) => {
     await route.fulfill({
       status: 404,
       contentType: "text/plain",
@@ -166,7 +166,7 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   await expect(page.getByLabel("Backend fond")).toHaveValue("auto");
   await expect(backgroundGroup.getByRole("button", { name: "Supprimer le fond" })).toBeVisible();
   await backgroundGroup.getByRole("button", { name: "Charger / verifier le modele" }).click();
-  await expect(page.getByText(/Modele RMBG-2.0 introuvable/).first()).toBeVisible();
+  await expect(page.getByText(/Modele RMBG-2.0 introuvable|Le chemin du modele renvoie l'application HTML/).first()).toBeVisible();
   await page.getByLabel("Remplacer le fond dans les exports").check();
   await expect(page.getByLabel("Remplacer le fond dans les exports")).toBeChecked();
   await page.getByLabel("Couleur de fond").evaluate((input) => {
@@ -255,7 +255,7 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
 });
 
 test("shows a clear background model error and keeps editing usable", async ({ page }) => {
-  await page.route("**/models/rmbg2/model.onnx", async (route) => {
+  await page.route("**/models/rmbg2/model.onnx**", async (route) => {
     await route.fulfill({
       status: 404,
       contentType: "text/plain",
@@ -274,7 +274,8 @@ test("shows a clear background model error and keeps editing usable", async ({ p
 
   await page.getByRole("button", { name: "Fond", exact: true }).click();
   await page.getByRole("button", { name: "Charger / verifier le modele" }).click();
-  await expect(page.getByText(/Modele RMBG-2.0 introuvable/).first()).toBeVisible();
+  await expect(page.getByText(/Modele RMBG-2.0 introuvable|Le chemin du modele renvoie l'application HTML/).first()).toBeVisible();
+  await expect(page.getByText(/URL testee|URL testée/).first()).toBeVisible();
   await expect(page.getByRole("slider", { name: "Zoom" })).toBeEnabled();
 
   await page.getByRole("button", { name: "Export", exact: true }).click();

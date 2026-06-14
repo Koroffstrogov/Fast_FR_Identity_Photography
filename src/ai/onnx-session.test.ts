@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   OnnxRuntimeApi,
+  createModelProbe,
   createConfiguredOnnxSession,
   loadLocalOnnxModel,
 } from "./onnx-session";
@@ -76,6 +77,40 @@ describe("ONNX session setup", () => {
     await expect(
       loadLocalOnnxModel("/models/rmbg2/model.onnx", async () => response),
     ).rejects.toThrow("Modele RMBG-2.0 introuvable");
+  });
+
+  it("reports Vite HTML fallback before ONNX session creation", async () => {
+    const runtime = createMockRuntime();
+    const htmlResponse = new Response("<!doctype html><script type=\"module\">", {
+      status: 200,
+      headers: {
+        "content-type": "text/html",
+        "content-length": "581",
+      },
+    });
+
+    await expect(
+      createConfiguredOnnxSession({
+        backendPreference: "cpu",
+        runtime,
+        fetchModel: async () => htmlResponse,
+      }),
+    ).rejects.toThrow("Le chemin du modele renvoie l'application HTML");
+
+    expect(runtime.InferenceSession.create).not.toHaveBeenCalled();
+  });
+
+  it("builds a cache-busted model probe URL from the current origin", () => {
+    vi.stubGlobal("window", {
+      location: { origin: "http://127.0.0.1:5173" },
+    });
+
+    expect(createModelProbe("/models/rmbg2/model.onnx", () => 123)).toEqual({
+      requestedPath: "/models/rmbg2/model.onnx",
+      requestedUrl:
+        "http://127.0.0.1:5173/models/rmbg2/model.onnx?cacheBust=123",
+      currentOrigin: "http://127.0.0.1:5173",
+    });
   });
 });
 
