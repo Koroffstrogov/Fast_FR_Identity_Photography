@@ -104,6 +104,12 @@ Copy-Item `
   -Force
 ```
 
+Ne melangez pas des fichiers `public/ort/` provenant d'une autre version
+`onnxruntime-web`. Les fichiers doivent etre recopies depuis le
+`node_modules/onnxruntime-web/dist/` installe par ce projet. Ils sont servis
+comme fichiers statiques au runtime ; ils ne doivent jamais etre importes depuis
+`src/` avec `import "/ort/..."` ou `new URL("/ort/...", import.meta.url)`.
+
 ### 4. Ajouter les modeles locaux optionnels
 
 L'application demarre sans modele IA, mais les fonctions de detection visage et

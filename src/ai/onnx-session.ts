@@ -1,8 +1,14 @@
-import * as ort from "onnxruntime-web/webgpu";
 import {
   BackgroundRemovalBackendPreference,
   BackgroundTechnicalDiagnostics,
 } from "../core/photo-project";
+import {
+  OnnxRuntimeApi,
+  OnnxSessionLike,
+  OnnxTensorLike,
+  configureOrtRuntime,
+  getOrtRuntime,
+} from "./configure-ort-runtime";
 import {
   BackendAttempt,
   getRuntimeCapabilities,
@@ -14,37 +20,7 @@ import {
   Rmbg2ModelConfig,
 } from "../background/rmbg2-config";
 
-export type OnnxTensorLike = {
-  readonly data: unknown;
-  readonly dims: readonly number[];
-};
-
-export type OnnxSessionLike = {
-  readonly inputNames: readonly string[];
-  readonly outputNames: readonly string[];
-  run(feeds: Record<string, unknown>): Promise<Record<string, OnnxTensorLike>>;
-  release?(): Promise<void>;
-};
-
-export type OnnxRuntimeApi = {
-  env: {
-    wasm: {
-      wasmPaths?: string | URL | { wasm?: string | URL; mjs?: string | URL };
-      numThreads?: number;
-    };
-  };
-  InferenceSession: {
-    create(
-      model: Uint8Array,
-      options: { executionProviders: readonly string[]; graphOptimizationLevel?: string },
-    ): Promise<OnnxSessionLike>;
-  };
-  Tensor: new (
-    type: "float32",
-    data: Float32Array,
-    dims: readonly number[],
-  ) => unknown;
-};
+export type { OnnxRuntimeApi, OnnxSessionLike, OnnxTensorLike };
 
 export type CreatedOnnxSession = {
   session: OnnxSessionLike;
@@ -81,12 +57,12 @@ const MIN_ONNX_MODEL_SIZE_BYTES = 1024;
 export async function createConfiguredOnnxSession({
   backendPreference,
   config = RMBG2_DEFAULT_CONFIG,
-  runtime = ort as unknown as OnnxRuntimeApi,
+  runtime = getOrtRuntime(),
   fetchModel = fetch,
   modelBytes,
   now = defaultNow,
 }: CreateOnnxSessionOptions): Promise<CreatedOnnxSession> {
-  configureOnnxRuntimeAssets(runtime, config);
+  configureOrtRuntime(runtime);
 
   const capabilities = getRuntimeCapabilities();
   const resolution = resolveBackgroundBackend(backendPreference, capabilities);
@@ -145,14 +121,6 @@ export async function createConfiguredOnnxSession({
   }
 
   throw new Error(formatSessionCreationError(backendPreference, errors));
-}
-
-export function configureOnnxRuntimeAssets(
-  runtime: OnnxRuntimeApi,
-  config: Rmbg2ModelConfig = RMBG2_DEFAULT_CONFIG,
-): void {
-  runtime.env.wasm.wasmPaths = config.ortWasmPath;
-  runtime.env.wasm.numThreads = 1;
 }
 
 export async function loadLocalOnnxModel(

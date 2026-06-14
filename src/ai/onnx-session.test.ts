@@ -5,6 +5,7 @@ import {
   createConfiguredOnnxSession,
   loadLocalOnnxModel,
 } from "./onnx-session";
+import { ORT_WASM_ASSET_PATHS } from "./configure-ort-runtime";
 
 describe("ONNX session setup", () => {
   afterEach(() => {
@@ -21,7 +22,7 @@ describe("ONNX session setup", () => {
       now: createNow([10, 42]),
     });
 
-    expect(runtime.env.wasm.wasmPaths).toBe("/ort/");
+    expect(runtime.env.wasm.wasmPaths).toEqual(ORT_WASM_ASSET_PATHS);
     expect(runtime.env.wasm.numThreads).toBe(1);
     expect(runtime.InferenceSession.create).toHaveBeenCalledWith(
       expect.any(Uint8Array),
