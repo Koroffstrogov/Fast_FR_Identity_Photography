@@ -80,7 +80,7 @@ describe("ONNX session setup", () => {
     const response = new Response("missing", { status: 404 });
 
     await expect(
-      loadLocalOnnxModel("/models/rmbg2/model.onnx", async () => response),
+      loadLocalOnnxModel("/models/rmbg2/model_fp16.onnx", async () => response),
     ).rejects.toThrow("Modele RMBG-2.0 introuvable");
   });
 
@@ -110,10 +110,10 @@ describe("ONNX session setup", () => {
       location: { origin: "http://127.0.0.1:5173" },
     });
 
-    expect(createModelProbe("/models/rmbg2/model.onnx", () => 123)).toEqual({
-      requestedPath: "/models/rmbg2/model.onnx",
+    expect(createModelProbe("/models/rmbg2/model_fp16.onnx", () => 123)).toEqual({
+      requestedPath: "/models/rmbg2/model_fp16.onnx",
       requestedUrl:
-        "http://127.0.0.1:5173/models/rmbg2/model.onnx?cacheBust=123",
+        "http://127.0.0.1:5173/models/rmbg2/model_fp16.onnx?cacheBust=123",
       currentOrigin: "http://127.0.0.1:5173",
     });
   });

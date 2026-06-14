@@ -16,9 +16,9 @@ import {
 } from "./runtime-capabilities";
 import {
   RMBG2_DEFAULT_CONFIG,
-  RMBG2_LOCAL_MODEL_PATH,
   RMBG2_MODEL_DIRECTORY,
   Rmbg2ModelConfig,
+  getRmbg2LocalModelPath,
 } from "../background/rmbg2-config";
 
 export type { OnnxRuntimeApi, OnnxSessionLike, OnnxTensorLike };
@@ -27,6 +27,16 @@ export type CreatedOnnxSession = {
   session: OnnxSessionLike;
   diagnostics: BackgroundTechnicalDiagnostics;
 };
+
+export class OnnxSessionCreationError extends Error {
+  constructor(
+    message: string,
+    public readonly diagnostics: BackgroundTechnicalDiagnostics,
+  ) {
+    super(message);
+    this.name = "OnnxSessionCreationError";
+  }
+}
 
 export type OnnxModelProbe = {
   requestedPath: string;
@@ -76,6 +86,12 @@ export async function createConfiguredOnnxSession({
     modelBytes !== undefined
       ? createLoadedModelFromBytes(config.modelPath, modelBytes)
       : await loadLocalOnnxModel(config.modelPath, fetchModel);
+  const baseDiagnostics = createBaseDiagnostics({
+    backendPreference,
+    config,
+    loadedModel,
+    provider: resolution.attempts.map((attempt) => attempt.provider).join(", "),
+  });
   const errors: string[] = [];
 
   for (const attempt of resolution.attempts) {
@@ -117,12 +133,26 @@ export async function createConfiguredOnnxSession({
       errors.push(formatAttemptError(attempt, error));
 
       if (backendPreference !== "auto" || attempt.provider !== "webgpu") {
-        throw new Error(formatSessionCreationError(backendPreference, errors));
+        throw new OnnxSessionCreationError(
+          formatSessionCreationError(backendPreference, errors),
+          {
+            ...baseDiagnostics,
+            activeBackend: attempt.activeBackend,
+            provider: attempt.provider,
+            fallbackMessage: errors.join(" "),
+          },
+        );
       }
     }
   }
 
-  throw new Error(formatSessionCreationError(backendPreference, errors));
+  throw new OnnxSessionCreationError(
+    formatSessionCreationError(backendPreference, errors),
+    {
+      ...baseDiagnostics,
+      fallbackMessage: errors.join(" "),
+    },
+  );
 }
 
 export async function loadLocalOnnxModel(
@@ -146,7 +176,7 @@ export async function loadLocalOnnxModel(
 
   if (!response.ok) {
     throw new Error(
-      `Modele RMBG-2.0 introuvable dans ${RMBG2_MODEL_DIRECTORY}. En developpement, placez le fichier dans ${RMBG2_LOCAL_MODEL_PATH}. URL testee : ${probe.requestedUrl} (HTTP ${response.status}).`,
+      `Modele RMBG-2.0 introuvable dans ${RMBG2_MODEL_DIRECTORY}. En developpement, placez le fichier dans ${getRmbg2LocalModelPath(modelPath)}. URL testee : ${probe.requestedUrl} (HTTP ${response.status}).`,
     );
   }
 
@@ -160,7 +190,7 @@ export async function loadLocalOnnxModel(
     throw new Error(
       [
         "Le chemin du modele renvoie l'application HTML.",
-        `Verifiez le port, le middleware Vite et la presence du fichier ${RMBG2_LOCAL_MODEL_PATH}.`,
+        `Verifiez le port, le middleware Vite et la presence du fichier ${getRmbg2LocalModelPath(modelPath)}.`,
         "En build statique, fournissez vous-meme le modele a l'URL attendue.",
         `Origin courant : ${probe.currentOrigin ?? "inconnu"}.`,
         `URL testee : ${probe.requestedUrl}.`,
@@ -204,6 +234,37 @@ function createLoadedModelFromBytes(
       ...probe,
       byteLength: bytes.byteLength,
     },
+  };
+}
+
+function createBaseDiagnostics({
+  backendPreference,
+  config,
+  loadedModel,
+  provider,
+}: {
+  backendPreference: BackgroundRemovalBackendPreference;
+  config: Rmbg2ModelConfig;
+  loadedModel: LoadedOnnxModel;
+  provider: string;
+}): BackgroundTechnicalDiagnostics {
+  return {
+    navigatorGpuAvailable: getRuntimeCapabilities().navigatorGpuAvailable,
+    requestedBackend: backendPreference,
+    activeBackend: "none",
+    provider,
+    modelPath: config.modelPath,
+    currentOrigin: loadedModel.probe.currentOrigin,
+    modelUrl: loadedModel.probe.requestedUrl,
+    modelHttpStatus: loadedModel.probe.status,
+    modelContentType: loadedModel.probe.contentType,
+    modelContentLength: loadedModel.probe.contentLength,
+    modelBytes: loadedModel.probe.byteLength,
+    ortWasmPath: config.ortWasmPath,
+    inputWidth: config.inputWidth,
+    inputHeight: config.inputHeight,
+    inputNames: [],
+    outputNames: [],
   };
 }
 

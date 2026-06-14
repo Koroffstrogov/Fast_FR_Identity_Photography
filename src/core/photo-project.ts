@@ -61,6 +61,7 @@ export type BackgroundTechnicalDiagnostics = {
 
 export type BackgroundEditState = {
   engine: BackgroundRemovalEngine;
+  modelPath: string;
   enabled: boolean;
   backendPreference: BackgroundRemovalBackendPreference;
   activeBackend: BackgroundRemovalActiveBackend;
@@ -137,6 +138,7 @@ export type CreatePhotoItemInput<TImage = HTMLImageElement> = {
 export const DEFAULT_FACE_GUIDE_OPACITY = 0.82;
 export const DEFAULT_SHEET_COPIES = 1;
 export const DEFAULT_BACKGROUND_REPLACEMENT_COLOR = "#eeeeee";
+export const DEFAULT_BACKGROUND_MODEL_PATH = "/models/rmbg2/model_fp16.onnx";
 
 export function getDefaultPhotoEditState(): PhotoEditState {
   return {
@@ -161,6 +163,7 @@ export function getDefaultPhotoFaceDetectionState(): PhotoFaceDetectionState {
 export function getDefaultBackgroundEditState(): BackgroundEditState {
   return {
     engine: "rmbg2",
+    modelPath: DEFAULT_BACKGROUND_MODEL_PATH,
     enabled: false,
     backendPreference: "auto",
     activeBackend: "none",

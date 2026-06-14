@@ -155,7 +155,7 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   await page.getByRole("button", { name: "Fond", exact: true }).click();
   await expect(canvas).toBeVisible();
   const backgroundGroup = page.getByRole("group", { name: "Fond" });
-  await page.route("**/models/rmbg2/model.onnx**", async (route) => {
+  await page.route("**/models/rmbg2/*.onnx**", async (route) => {
     await route.fulfill({
       status: 404,
       contentType: "text/plain",
@@ -255,7 +255,7 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
 });
 
 test("shows a clear background model error and keeps editing usable", async ({ page }) => {
-  await page.route("**/models/rmbg2/model.onnx**", async (route) => {
+  await page.route("**/models/rmbg2/*.onnx**", async (route) => {
     await route.fulfill({
       status: 404,
       contentType: "text/plain",

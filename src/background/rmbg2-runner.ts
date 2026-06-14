@@ -21,6 +21,7 @@ import {
 
 type LoadedSession = {
   backendPreference: BackgroundRemovalBackendPreference;
+  config: Rmbg2ModelConfig;
   session: OnnxSessionLike;
   diagnostics: BackgroundTechnicalDiagnostics;
 };
@@ -32,7 +33,7 @@ export type Rmbg2RunnerOptions = {
 };
 
 export class Rmbg2BackgroundRemovalRunner implements BackgroundRemovalRunner {
-  private readonly config: Rmbg2ModelConfig;
+  private readonly defaultConfig: Rmbg2ModelConfig;
   private readonly runtime: OnnxRuntimeApi;
   private readonly now: () => number;
   private loadedSession: LoadedSession | null = null;
@@ -42,17 +43,21 @@ export class Rmbg2BackgroundRemovalRunner implements BackgroundRemovalRunner {
     runtime = getOrtRuntime(),
     now = defaultNow,
   }: Rmbg2RunnerOptions = {}) {
-    this.config = config;
+    this.defaultConfig = config;
     this.runtime = runtime;
     this.now = now;
   }
 
   async load(
     backendPreference: BackgroundRemovalBackendPreference,
+    config = this.defaultConfig,
   ): Promise<BackgroundTechnicalDiagnostics> {
     const existingSession = this.loadedSession;
 
-    if (existingSession?.backendPreference === backendPreference) {
+    if (
+      existingSession?.backendPreference === backendPreference &&
+      existingSession.config.modelPath === config.modelPath
+    ) {
       return existingSession.diagnostics;
     }
 
@@ -60,13 +65,14 @@ export class Rmbg2BackgroundRemovalRunner implements BackgroundRemovalRunner {
 
     const createdSession = await createConfiguredOnnxSession({
       backendPreference,
-      config: this.config,
+      config,
       runtime: this.runtime,
       now: this.now,
     });
 
     this.loadedSession = {
       backendPreference,
+      config,
       session: createdSession.session,
       diagnostics: createdSession.diagnostics,
     };
@@ -77,18 +83,19 @@ export class Rmbg2BackgroundRemovalRunner implements BackgroundRemovalRunner {
   async removeBackground(
     image: HTMLImageElement,
     backendPreference: BackgroundRemovalBackendPreference,
+    config = this.defaultConfig,
   ): Promise<BackgroundRemovalResult> {
-    const diagnostics = await this.load(backendPreference);
+    const diagnostics = await this.load(backendPreference, config);
     const loadedSession = this.loadedSession;
 
     if (!loadedSession) {
       throw new Error("Session RMBG-2.0 non initialisee.");
     }
 
-    const input = preprocessImageElementForRmbg2(image, this.config);
+    const input = preprocessImageElementForRmbg2(image, config);
     const inputName = selectModelTensorName(
       loadedSession.session.inputNames,
-      this.config.modelInputName,
+      config.modelInputName,
       "input",
     );
     const startedAt = this.now();
@@ -98,7 +105,7 @@ export class Rmbg2BackgroundRemovalRunner implements BackgroundRemovalRunner {
     const outputSelection = extractRmbg2AlphaMask(
       outputs,
       loadedSession.session.outputNames,
-      this.config,
+      config,
     );
     const nextDiagnostics: BackgroundTechnicalDiagnostics = {
       ...diagnostics,

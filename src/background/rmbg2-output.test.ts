@@ -3,7 +3,7 @@ import { Rmbg2ModelConfig } from "./rmbg2-config";
 import { extractRmbg2AlphaMask, selectModelTensorName } from "./rmbg2-output";
 
 const TEST_CONFIG: Rmbg2ModelConfig = {
-  modelPath: "/models/rmbg2/model.onnx",
+  modelPath: "/models/rmbg2/model_fp16.onnx",
   ortWasmPath: "/ort/",
   inputWidth: 2,
   inputHeight: 2,

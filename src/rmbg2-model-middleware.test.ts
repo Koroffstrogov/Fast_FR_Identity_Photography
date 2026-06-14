@@ -23,8 +23,11 @@ afterEach(async () => {
 
 describe("RMBG-2.0 local model Vite middleware", () => {
   it("matches only the runtime model route", () => {
-    expect(isRmbg2ModelRequest("/models/rmbg2/model.onnx?cacheBust=1")).toBe(true);
-    expect(isRmbg2ModelRequest("/models/rmbg2/other.onnx")).toBe(false);
+    expect(isRmbg2ModelRequest("/models/rmbg2/model_fp16.onnx?cacheBust=1")).toBe(true);
+    expect(isRmbg2ModelRequest("/models/rmbg2/model_quantized.onnx")).toBe(true);
+    expect(isRmbg2ModelRequest("/models/rmbg2/model_uint8.onnx")).toBe(true);
+    expect(isRmbg2ModelRequest("/models/rmbg2/../model_fp16.onnx")).toBe(false);
+    expect(isRmbg2ModelRequest("/models/rmbg2/not-a-model.txt")).toBe(false);
   });
 
   it("serves the local model for GET and HEAD", async () => {

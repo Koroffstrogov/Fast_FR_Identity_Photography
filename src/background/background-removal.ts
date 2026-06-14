@@ -6,6 +6,7 @@ import {
   BackgroundRemovalResult,
   BackgroundRemovalRunner,
 } from "./background-removal-runner";
+import { Rmbg2ModelConfig } from "./rmbg2-config";
 
 export type BackgroundRemovalStatus = "idle" | "loading" | "ready" | "error";
 
@@ -18,24 +19,27 @@ export function getBackgroundRemovalStatus(): BackgroundRemovalStatus {
 
 export async function loadBackgroundRemovalModel(
   backendPreference: BackgroundRemovalBackendPreference,
+  config?: Rmbg2ModelConfig,
 ): Promise<BackgroundTechnicalDiagnostics> {
   status = "loading";
 
   try {
     const diagnostics = await (await getBackgroundRemovalRunner()).load(
       backendPreference,
+      config,
     );
     status = "ready";
     return diagnostics;
   } catch (error) {
     status = "error";
-    throw new Error(getBackgroundRemovalErrorMessage(error));
+    throw createBackgroundRemovalError(error);
   }
 }
 
 export async function removeImageBackground(
   image: HTMLImageElement,
   backendPreference: BackgroundRemovalBackendPreference,
+  config?: Rmbg2ModelConfig,
 ): Promise<BackgroundRemovalResult> {
   status = "loading";
 
@@ -43,12 +47,13 @@ export async function removeImageBackground(
     const result = await (await getBackgroundRemovalRunner()).removeBackground(
       image,
       backendPreference,
+      config,
     );
     status = "ready";
     return result;
   } catch (error) {
     status = "error";
-    throw new Error(getBackgroundRemovalErrorMessage(error));
+    throw createBackgroundRemovalError(error);
   }
 }
 
@@ -74,6 +79,27 @@ export function setBackgroundRemovalRunnerForTests(
 ): void {
   runner = nextRunner;
   status = "idle";
+}
+
+function createBackgroundRemovalError(error: unknown): Error {
+  const wrappedError = new Error(getBackgroundRemovalErrorMessage(error));
+
+  if (hasBackgroundDiagnostics(error)) {
+    Object.assign(wrappedError, { diagnostics: error.diagnostics });
+  }
+
+  return wrappedError;
+}
+
+function hasBackgroundDiagnostics(
+  error: unknown,
+): error is { diagnostics: BackgroundTechnicalDiagnostics } {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "diagnostics" in error &&
+    typeof (error as { diagnostics?: unknown }).diagnostics === "object"
+  );
 }
 
 async function getBackgroundRemovalRunner(): Promise<BackgroundRemovalRunner> {

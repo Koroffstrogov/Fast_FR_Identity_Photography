@@ -9,7 +9,10 @@ import { BackgroundRemovalStatus } from "../background/background-removal";
 import {
   RMBG2_DEFAULT_CONFIG,
   RMBG2_ENGINE_LABEL,
-  RMBG2_LOCAL_MODEL_PATH,
+  RMBG2_MODEL_OPTIONS,
+  getRmbg2LocalModelPath,
+  getRmbg2ModelFileName,
+  getRmbg2ModelOption,
 } from "../background/rmbg2-config";
 
 export type BackgroundPointMode = "none" | "foreground" | "background";
@@ -47,7 +50,10 @@ export function BackgroundPanel({
     edit.manualForegroundPoints.length + edit.manualBackgroundPoints.length;
   const diagnostics = edit.technicalDiagnostics;
   const browserOrigin = getBrowserOrigin();
-  const fallbackModelUrl = getModelUrlForOrigin(browserOrigin);
+  const selectedModelPath = edit.modelPath || RMBG2_DEFAULT_CONFIG.modelPath;
+  const selectedModelOption = getRmbg2ModelOption(selectedModelPath);
+  const selectedModelName = selectedModelOption?.label ?? getRmbg2ModelFileName(selectedModelPath);
+  const fallbackModelUrl = getModelUrlForOrigin(browserOrigin, selectedModelPath);
   const navigatorGpuAvailable =
     diagnostics?.navigatorGpuAvailable ?? getRuntimeCapabilities().navigatorGpuAvailable;
 
@@ -56,7 +62,30 @@ export function BackgroundPanel({
       <legend>Fond</legend>
 
       <p className="model-status">Moteur : {RMBG2_ENGINE_LABEL}</p>
-      <p className="model-status">Modele : {getRemovalStatusLabel(removalStatus)}</p>
+      <p className="model-status">Etat modele : {getRemovalStatusLabel(removalStatus)}</p>
+
+      <label className="select-control">
+        <span>Modele RMBG</span>
+        <select
+          aria-label="Modele RMBG"
+          value={selectedModelPath}
+          onChange={(event) =>
+            onBackgroundChange({
+              modelPath: event.currentTarget.value,
+            })
+          }
+          disabled={disabled || isBusy}
+        >
+          {RMBG2_MODEL_OPTIONS.map((option) => (
+            <option key={option.modelPath} value={option.modelPath}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="manual-note">
+        {selectedModelOption?.description ?? "Modele RMBG local configurable."}
+      </p>
 
       <label className="select-control">
         <span>Backend fond</span>
@@ -260,6 +289,14 @@ export function BackgroundPanel({
           <dd>{diagnostics?.provider ?? "-"}</dd>
         </div>
         <div>
+          <dt>Modele charge</dt>
+          <dd>{getLoadedModelLabel(diagnostics?.modelPath, selectedModelName)}</dd>
+        </div>
+        <div>
+          <dt>Taille modele</dt>
+          <dd>{formatBytes(diagnostics?.modelBytes)}</dd>
+        </div>
+        <div>
           <dt>Session</dt>
           <dd>{formatMs(diagnostics?.sessionCreationMs)}</dd>
         </div>
@@ -279,12 +316,15 @@ export function BackgroundPanel({
 
       <details className="technical-details">
         <summary>Details ONNX</summary>
-        <p>Input detecte : {diagnostics?.selectedInputName ?? diagnostics?.inputNames.join(", ") ?? "-"}</p>
-        <p>Output detecte : {diagnostics?.selectedOutputName ?? diagnostics?.outputNames.join(", ") ?? "-"}</p>
+        <p>Input detecte : {diagnostics?.selectedInputName ?? "-"}</p>
+        <p>Output detecte : {diagnostics?.selectedOutputName ?? "-"}</p>
+        <p>Input names : {formatNames(diagnostics?.inputNames)}</p>
+        <p>Output names : {formatNames(diagnostics?.outputNames)}</p>
         <p>Assets WASM : {diagnostics?.ortWasmPath ?? "/ort/"}</p>
         <p>Origin courant : {diagnostics?.currentOrigin ?? browserOrigin ?? "-"}</p>
-        <p>Modele : {diagnostics?.modelPath ?? RMBG2_DEFAULT_CONFIG.modelPath}</p>
-        <p>Fichier local dev : {RMBG2_LOCAL_MODEL_PATH}</p>
+        <p>Modele : {diagnostics?.modelPath ?? selectedModelPath}</p>
+        <p>Nom modele : {getRmbg2ModelFileName(diagnostics?.modelPath ?? selectedModelPath)}</p>
+        <p>Fichier local dev : {getRmbg2LocalModelPath(selectedModelPath)}</p>
         <p>URL testee : {diagnostics?.modelUrl ?? fallbackModelUrl}</p>
         <p>HTTP modele : {diagnostics?.modelHttpStatus ?? "-"}</p>
         <p>Content-Type modele : {diagnostics?.modelContentType ?? "-"}</p>
@@ -408,10 +448,38 @@ function getBrowserOrigin(): string | undefined {
   return window.location.origin;
 }
 
-function getModelUrlForOrigin(origin: string | undefined): string {
+function getModelUrlForOrigin(origin: string | undefined, modelPath: string): string {
   if (!origin) {
-    return RMBG2_DEFAULT_CONFIG.modelPath;
+    return modelPath;
   }
 
-  return new URL(RMBG2_DEFAULT_CONFIG.modelPath, origin).toString();
+  return new URL(modelPath, origin).toString();
+}
+
+function getLoadedModelLabel(
+  loadedModelPath: string | undefined,
+  fallbackLabel: string,
+): string {
+  if (!loadedModelPath) {
+    return fallbackLabel;
+  }
+
+  return getRmbg2ModelOption(loadedModelPath)?.label ?? getRmbg2ModelFileName(loadedModelPath);
+}
+
+function formatBytes(value: number | undefined): string {
+  if (typeof value !== "number") {
+    return "-";
+  }
+
+  if (value < 1024) {
+    return `${value} o`;
+  }
+
+  const megaBytes = value / (1024 * 1024);
+  return `${megaBytes.toFixed(1)} Mo`;
+}
+
+function formatNames(names: string[] | undefined): string {
+  return names && names.length > 0 ? names.join(", ") : "-";
 }

@@ -3,7 +3,7 @@ import { Rmbg2ModelConfig } from "./rmbg2-config";
 import { preprocessImageDataForRmbg2 } from "./rmbg2-preprocess";
 
 const TEST_CONFIG: Rmbg2ModelConfig = {
-  modelPath: "/models/rmbg2/model.onnx",
+  modelPath: "/models/rmbg2/model_fp16.onnx",
   ortWasmPath: "/ort/",
   inputWidth: 2,
   inputHeight: 1,

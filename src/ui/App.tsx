@@ -27,6 +27,7 @@ import {
 import {
   PhotoItem,
   PhotoManualFacePointKind,
+  BackgroundTechnicalDiagnostics,
   PhotoUsage,
   addBackgroundPoint,
   clampCopies,
@@ -74,6 +75,7 @@ import {
   loadBackgroundRemovalModel,
   removeImageBackground,
 } from "../background/background-removal";
+import { createRmbg2ConfigForModelPath } from "../background/rmbg2-config";
 import { analyzeFaceLandmarks } from "../vision/face-landmarks";
 import {
   createFacePointsFromCandidate,
@@ -697,6 +699,7 @@ export function App() {
     }
 
     const backgroundEdit = photo.backgroundEdit ?? getDefaultBackgroundEditState();
+    const modelConfig = createRmbg2ConfigForModelPath(backgroundEdit.modelPath);
 
     setBackgroundRemovalStatus("loading");
     setBackgroundRemovalError("");
@@ -704,12 +707,14 @@ export function App() {
     try {
       const diagnostics = await loadBackgroundRemovalModel(
         backgroundEdit.backendPreference,
+        modelConfig,
       );
       setBackgroundRemovalStatus("ready");
       updatePhoto(photo.id, (currentPhoto) => ({
         ...currentPhoto,
         backgroundEdit: {
           ...(currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState()),
+          modelPath: backgroundEdit.modelPath,
           activeBackend: diagnostics.activeBackend,
           technicalDiagnostics: diagnostics,
           message:
@@ -730,6 +735,9 @@ export function App() {
         ...currentPhoto,
         backgroundEdit: {
           ...(currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState()),
+          ...(hasBackgroundDiagnostics(loadError)
+            ? { technicalDiagnostics: loadError.diagnostics }
+            : {}),
           message,
         },
       }));
@@ -752,6 +760,8 @@ export function App() {
     const backendPreference =
       photo.backgroundEdit?.backendPreference ??
       getDefaultBackgroundEditState().backendPreference;
+    const backgroundEdit = photo.backgroundEdit ?? getDefaultBackgroundEditState();
+    const modelConfig = createRmbg2ConfigForModelPath(backgroundEdit.modelPath);
 
     updatePhoto(photo.id, (currentPhoto) => ({
       ...currentPhoto,
@@ -768,7 +778,11 @@ export function App() {
     }
 
     try {
-      const result = await removeImageBackground(photo.image, backendPreference);
+      const result = await removeImageBackground(
+        photo.image,
+        backendPreference,
+        modelConfig,
+      );
 
       updatePhoto(photo.id, (currentPhoto) => {
         const backgroundEdit =
@@ -803,6 +817,9 @@ export function App() {
         ...currentPhoto,
         backgroundEdit: {
           ...(currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState()),
+          ...(hasBackgroundDiagnostics(removeError)
+            ? { technicalDiagnostics: removeError.diagnostics }
+            : {}),
           message,
         },
       }));
@@ -812,18 +829,38 @@ export function App() {
   function handleBackgroundChange(
     partialEdit: Partial<NonNullable<PhotoItem["backgroundEdit"]>>,
   ) {
-    if (partialEdit.backendPreference !== undefined) {
+    if (
+      partialEdit.backendPreference !== undefined ||
+      partialEdit.modelPath !== undefined
+    ) {
       setBackgroundRemovalStatus("idle");
       setBackgroundRemovalError("");
     }
 
-    updateActivePhoto((photo) => ({
-      ...photo,
-      backgroundEdit: {
-        ...(photo.backgroundEdit ?? getDefaultBackgroundEditState()),
-        ...partialEdit,
-      },
-    }));
+    updateActivePhoto((photo) => {
+      const backgroundEdit = photo.backgroundEdit ?? getDefaultBackgroundEditState();
+      const modelChanged =
+        partialEdit.modelPath !== undefined &&
+        partialEdit.modelPath !== backgroundEdit.modelPath;
+
+      return {
+        ...photo,
+        backgroundEdit: {
+          ...backgroundEdit,
+          ...(modelChanged
+            ? {
+                enabled: false,
+                activeBackend: "none" as const,
+                rawMask: undefined,
+                technicalDiagnostics: undefined,
+                maskVersion: backgroundEdit.maskVersion + 1,
+                message: "Modele RMBG change. Rechargez le modele avant inference.",
+              }
+            : {}),
+          ...partialEdit,
+        },
+      };
+    });
   }
 
   function handleResetBackgroundPoints() {
@@ -1466,4 +1503,15 @@ function createPhotoItemId(): string {
   photoIdCounter += 1;
 
   return `photo-${Date.now()}-${photoIdCounter}`;
+}
+
+function hasBackgroundDiagnostics(
+  error: unknown,
+): error is { diagnostics: BackgroundTechnicalDiagnostics } {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "diagnostics" in error &&
+    typeof (error as { diagnostics?: unknown }).diagnostics === "object"
+  );
 }
