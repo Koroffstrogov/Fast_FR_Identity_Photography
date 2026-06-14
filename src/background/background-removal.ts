@@ -6,7 +6,7 @@ import {
   BackgroundRemovalResult,
   BackgroundRemovalRunner,
 } from "./background-removal-runner";
-import { Rmbg2ModelConfig } from "./rmbg2-config";
+import { RmbgModelConfig } from "./rmbg-config";
 
 export type BackgroundRemovalStatus = "idle" | "loading" | "ready" | "error";
 
@@ -19,7 +19,7 @@ export function getBackgroundRemovalStatus(): BackgroundRemovalStatus {
 
 export async function loadBackgroundRemovalModel(
   backendPreference: BackgroundRemovalBackendPreference,
-  config?: Rmbg2ModelConfig,
+  config?: RmbgModelConfig,
 ): Promise<BackgroundTechnicalDiagnostics> {
   status = "loading";
 
@@ -39,7 +39,7 @@ export async function loadBackgroundRemovalModel(
 export async function removeImageBackground(
   image: HTMLImageElement,
   backendPreference: BackgroundRemovalBackendPreference,
-  config?: Rmbg2ModelConfig,
+  config?: RmbgModelConfig,
 ): Promise<BackgroundRemovalResult> {
   status = "loading";
 
@@ -108,8 +108,8 @@ async function getBackgroundRemovalRunner(): Promise<BackgroundRemovalRunner> {
     return runner;
   }
 
-  const { Rmbg2BackgroundRemovalRunner } = await import("./rmbg2-runner");
-  runner = new Rmbg2BackgroundRemovalRunner();
+  const { RmbgBackgroundRemovalRunner } = await import("./rmbg-runner");
+  runner = new RmbgBackgroundRemovalRunner();
 
   return runner;
 }

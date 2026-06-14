@@ -3,7 +3,7 @@ import {
   BackgroundTechnicalDiagnostics,
   BackgroundMaskData,
 } from "../core/photo-project";
-import { Rmbg2ModelConfig } from "./rmbg2-config";
+import { RmbgModelConfig } from "./rmbg-config";
 
 export type BackgroundRemovalResult = {
   mask: BackgroundMaskData;
@@ -14,12 +14,12 @@ export type BackgroundRemovalResult = {
 export interface BackgroundRemovalRunner {
   load(
     backendPreference: BackgroundRemovalBackendPreference,
-    config?: Rmbg2ModelConfig,
+    config?: RmbgModelConfig,
   ): Promise<BackgroundTechnicalDiagnostics>;
   removeBackground(
     image: HTMLImageElement,
     backendPreference: BackgroundRemovalBackendPreference,
-    config?: Rmbg2ModelConfig,
+    config?: RmbgModelConfig,
   ): Promise<BackgroundRemovalResult>;
   dispose?(): Promise<void>;
 }

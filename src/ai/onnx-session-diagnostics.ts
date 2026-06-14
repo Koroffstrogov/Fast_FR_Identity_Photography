@@ -8,7 +8,7 @@ import {
 } from "./configure-ort-runtime";
 import { loadLocalOnnxModel } from "./onnx-session";
 import { OnnxSessionDiagnosticResult } from "../core/photo-project";
-import { getRmbgEngineForModelPath } from "../background/rmbg2-config";
+import { getRmbgEngineForModelPath } from "../background/rmbg-config";
 
 type OnnxSessionDiagnosticVariant = {
   id: string;

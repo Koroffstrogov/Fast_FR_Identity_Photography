@@ -5,12 +5,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  RMBG14_LOCAL_MODEL_RELATIVE_PATH,
-  RMBG14_MODEL_DEV_ROUTE,
-  RMBG2_LOCAL_MODEL_RELATIVE_PATH,
-  RMBG2_MODEL_DEV_ROUTE,
-  createRmbg2ModelMiddleware,
-  isRmbg2ModelRequest,
+  RMBG_LOCAL_MODEL_RELATIVE_PATH,
+  RMBG_MODEL_DEV_ROUTE,
+  createRmbgModelMiddleware,
+  isRmbgModelRequest,
 } from "../vite.rmbg-model";
 
 const tempRoots: string[] = [];
@@ -24,55 +22,32 @@ afterEach(async () => {
 });
 
 describe("RMBG local model Vite middleware", () => {
-  it("matches only the runtime model route", () => {
-    expect(isRmbg2ModelRequest("/models/rmbg1.4/model.onnx")).toBe(true);
-    expect(isRmbg2ModelRequest("/models/rmbg1.4/model_fp16.onnx")).toBe(true);
-    expect(isRmbg2ModelRequest("/models/rmbg1.4/model_quantized.onnx")).toBe(true);
-    expect(isRmbg2ModelRequest("/models/rmbg2/model_fp16.onnx?cacheBust=1")).toBe(true);
-    expect(isRmbg2ModelRequest("/models/rmbg2/model_quantized.onnx")).toBe(true);
-    expect(isRmbg2ModelRequest("/models/rmbg2/model_uint8.onnx")).toBe(true);
-    expect(isRmbg2ModelRequest("/models/rmbg1.4/../model_fp16.onnx")).toBe(false);
-    expect(isRmbg2ModelRequest("/models/rmbg2/../model_fp16.onnx")).toBe(false);
-    expect(isRmbg2ModelRequest("/models/rmbg2/not-a-model.txt")).toBe(false);
+  it("matches only the RMBG-1.4 runtime model route", () => {
+    expect(isRmbgModelRequest("/models/rmbg1.4/model.onnx")).toBe(true);
+    expect(isRmbgModelRequest("/models/rmbg1.4/model_fp16.onnx")).toBe(true);
+    expect(isRmbgModelRequest("/models/rmbg1.4/model_quantized.onnx")).toBe(true);
+    expect(isRmbgModelRequest("/models/rmbg1.4/../model_fp16.onnx")).toBe(false);
+    expect(isRmbgModelRequest("/models/rmbg1.4/not-a-model.txt")).toBe(false);
+    expect(isRmbgModelRequest(`/models/${"rmbg" + "2"}/model_fp16.onnx`)).toBe(
+      false,
+    );
   });
 
   it("serves RMBG-1.4 local models for GET and HEAD", async () => {
     const root = await createTempRoot();
-    const modelPath = join(root, RMBG14_LOCAL_MODEL_RELATIVE_PATH);
+    const modelPath = join(root, RMBG_LOCAL_MODEL_RELATIVE_PATH);
     await mkdir(dirname(modelPath), { recursive: true });
     await writeFile(modelPath, Buffer.from([1, 2, 3, 4]));
 
     const origin = await startServer(root);
 
-    const getResponse = await fetch(`${origin}${RMBG14_MODEL_DEV_ROUTE}?cacheBust=1`);
+    const getResponse = await fetch(`${origin}${RMBG_MODEL_DEV_ROUTE}?cacheBust=1`);
     expect(getResponse.status).toBe(200);
     expect(getResponse.headers.get("content-type")).toBe("application/octet-stream");
     expect(getResponse.headers.get("content-length")).toBe("4");
     expect([...new Uint8Array(await getResponse.arrayBuffer())]).toEqual([1, 2, 3, 4]);
 
-    const headResponse = await fetch(`${origin}${RMBG14_MODEL_DEV_ROUTE}`, {
-      method: "HEAD",
-    });
-    expect(headResponse.status).toBe(200);
-    expect(headResponse.headers.get("content-length")).toBe("4");
-    expect((await headResponse.arrayBuffer()).byteLength).toBe(0);
-  });
-
-  it("serves RMBG-2.0 local models for GET and HEAD", async () => {
-    const root = await createTempRoot();
-    const modelPath = join(root, RMBG2_LOCAL_MODEL_RELATIVE_PATH);
-    await mkdir(dirname(modelPath), { recursive: true });
-    await writeFile(modelPath, Buffer.from([1, 2, 3, 4]));
-
-    const origin = await startServer(root);
-
-    const getResponse = await fetch(`${origin}${RMBG2_MODEL_DEV_ROUTE}?cacheBust=1`);
-    expect(getResponse.status).toBe(200);
-    expect(getResponse.headers.get("content-type")).toBe("application/octet-stream");
-    expect(getResponse.headers.get("content-length")).toBe("4");
-    expect([...new Uint8Array(await getResponse.arrayBuffer())]).toEqual([1, 2, 3, 4]);
-
-    const headResponse = await fetch(`${origin}${RMBG2_MODEL_DEV_ROUTE}`, {
+    const headResponse = await fetch(`${origin}${RMBG_MODEL_DEV_ROUTE}`, {
       method: "HEAD",
     });
     expect(headResponse.status).toBe(200);
@@ -84,23 +59,23 @@ describe("RMBG local model Vite middleware", () => {
     const root = await createTempRoot();
     const origin = await startServer(root);
 
-    const response = await fetch(`${origin}${RMBG14_MODEL_DEV_ROUTE}`);
+    const response = await fetch(`${origin}${RMBG_MODEL_DEV_ROUTE}`);
     const body = await response.text();
 
     expect(response.status).toBe(404);
     expect(response.headers.get("content-type")).toContain("text/plain");
-    expect(body).toContain(RMBG14_LOCAL_MODEL_RELATIVE_PATH);
+    expect(body).toContain(RMBG_LOCAL_MODEL_RELATIVE_PATH);
   });
 });
 
 async function createTempRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "rmbg2-model-"));
+  const root = await mkdtemp(join(tmpdir(), "rmbg-model-"));
   tempRoots.push(root);
   return root;
 }
 
 async function startServer(root: string): Promise<string> {
-  const middleware = createRmbg2ModelMiddleware(root);
+  const middleware = createRmbgModelMiddleware(root);
   const server = createServer((request, response) => {
     middleware(request, response, () => {
       response.statusCode = 404;

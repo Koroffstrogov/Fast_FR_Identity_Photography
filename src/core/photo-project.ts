@@ -14,7 +14,7 @@ export type PhotoUsage = "college" | "sport" | "badge" | "autre";
 
 export type BackgroundPreviewMode = "original" | "replace" | "mask-preview";
 
-export type BackgroundRemovalEngine = "rmbg1.4" | "rmbg2" | "legacy";
+export type BackgroundRemovalEngine = "rmbg1.4" | "legacy";
 
 export type BackgroundRemovalBackendPreference = "auto" | "gpu" | "cpu";
 

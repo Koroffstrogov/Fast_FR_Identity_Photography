@@ -25,8 +25,7 @@ IA sont servis localement et les modeles RMBG restent hors du build.
 - traits de coupe et regle 10 cm imprimable ;
 - page d'impression A4 avec CSS print ;
 - diagnostic qualite local et amelioration automatique legere ;
-- suppression/remplacement local du fond via RMBG-1.4 ONNX ou RMBG-2.0 ONNX
-  experimental, WebGPU/CPU ;
+- suppression/remplacement local du fond via RMBG-1.4 ONNX, WebGPU/CPU ;
 - apercus `Original`, `Masque`, `Fond remplace` ;
 - exports photo, ZIP, planche A4 et impression avec fond remplace quand active.
 
@@ -40,7 +39,7 @@ UI ne sont jamais inclus dans les exports propres.
 - navigateur moderne sur PC ;
 - WebGPU recommande pour la suppression de fond, CPU/WASM disponible en fallback ;
 - modele visage MediaPipe local si vous utilisez la detection visage ;
-- modele RMBG-1.4 ou RMBG-2.0 ONNX local si vous utilisez la suppression du fond.
+- modele RMBG-1.4 ONNX local si vous utilisez la suppression du fond.
 
 ## Installation
 
@@ -138,15 +137,6 @@ local-models/rmbg1.4/model_fp16.onnx
 local-models/rmbg1.4/model_quantized.onnx
 ```
 
-RMBG-2.0 reste disponible comme moteur experimental haute qualite. Ses variantes
-reconnues sont :
-
-```text
-local-models/rmbg2/model_fp16.onnx
-local-models/rmbg2/model_quantized.onnx
-local-models/rmbg2/model_uint8.onnx
-```
-
 Ces fichiers ne sont pas fournis, ne sont pas telecharges automatiquement et
 sont ignores par Git. Ils ne doivent pas etre places dans `public/`, sinon Vite
 les copiera dans `dist/` pendant `npm run build`. En developpement, un
@@ -157,9 +147,6 @@ par l'application :
 /models/rmbg1.4/model.onnx
 /models/rmbg1.4/model_fp16.onnx
 /models/rmbg1.4/model_quantized.onnx
-/models/rmbg2/model_fp16.onnx
-/models/rmbg2/model_quantized.onnx
-/models/rmbg2/model_uint8.onnx
 ```
 
 Apres copie, verifier qu'il existe et qu'il ne s'agit pas d'un fichier HTML ou
@@ -171,9 +158,9 @@ Format-Hex local-models/rmbg1.4/model_fp16.onnx -Count 32
 ```
 
 Pour un deploiement statique, `local-models/` n'est pas inclus dans le build.
-Il faut donc fournir vous-meme les modeles aux URLs `/models/rmbg1.4/*.onnx` ou
-`/models/rmbg2/*.onnx` sur le serveur statique final, ou adapter la
-configuration `modelPath` si vous hebergez un modele a une autre URL.
+Il faut donc fournir vous-meme les modeles aux URLs `/models/rmbg1.4/*.onnx`
+sur le serveur statique final, ou adapter la configuration `modelPath` si vous
+hebergez un modele a une autre URL.
 
 Pour la detection visage, le modele MediaPipe est documente plus bas dans
 `Configuration des modeles locaux`.
@@ -205,8 +192,7 @@ aident a diagnostiquer un probleme de modele :
 
 Si le modele renvoie `text/html`, le navigateur recoit l'application Vite au
 lieu du fichier ONNX. Verifier alors le port ouvert, le middleware Vite et la
-presence du modele selectionne dans `local-models/rmbg1.4/` ou
-`local-models/rmbg2/`.
+presence du modele selectionne dans `local-models/rmbg1.4/`.
 
 ### 7. Construire et previsualiser le build
 
@@ -250,22 +236,18 @@ Invoke-WebRequest `
 
 Le fichier `.task` est ignore par Git.
 
-### Suppression du fond RMBG-1.4 et RMBG-2.0
+### Suppression du fond RMBG-1.4
 
-Le moteur recommande pour compatibilite web est RMBG-1.4 via ONNX Runtime Web.
-RMBG-2.0 reste disponible comme moteur experimental haute qualite, mais certains
-exports ONNX directs peuvent echouer a creer une session dans ONNX Runtime Web
-avec une erreur de shape inference.
+Le moteur de suppression de fond est RMBG-1.4 via ONNX Runtime Web. Il est
+utilise localement dans le navigateur, avec WebGPU recommande et CPU/WASM en
+fallback.
 
 Assets attendus :
 
-- modele recommande compatibilite web : `local-models/rmbg1.4/model_fp16.onnx`
+- modele recommande : `local-models/rmbg1.4/model_fp16.onnx`
 - variantes RMBG-1.4 : `model.onnx`, `model_fp16.onnx`, `model_quantized.onnx`
-- variantes RMBG-2.0 experimentales : `model_fp16.onnx`,
-  `model_quantized.onnx`, `model_uint8.onnx`
 - URLs servies par Vite en developpement :
-  `/models/rmbg1.4/<nom-du-modele>.onnx` et
-  `/models/rmbg2/<nom-du-modele>.onnx`
+  `/models/rmbg1.4/<nom-du-modele>.onnx`
 - runtime ONNX : `public/ort/`
 
 Les modeles ne sont pas telecharges automatiquement et ne sont pas committes.
@@ -273,38 +255,27 @@ Placez-les manuellement :
 
 ```powershell
 New-Item -ItemType Directory -Force local-models/rmbg1.4
-New-Item -ItemType Directory -Force local-models/rmbg2
 
-# Copier ensuite le modele recommande compatibilite web ici :
+# Copier ensuite le modele recommande ici :
 # local-models/rmbg1.4/model_fp16.onnx
 #
 # Variantes RMBG-1.4 optionnelles :
 # local-models/rmbg1.4/model.onnx
 # local-models/rmbg1.4/model_quantized.onnx
-#
-# Variantes RMBG-2.0 experimentales :
-# local-models/rmbg2/model_fp16.onnx
-# local-models/rmbg2/model_quantized.onnx
-# local-models/rmbg2/model_uint8.onnx
 ```
 
 `local-models/` est ignore par Git et n'est pas copie dans `dist/`. Cela evite
 de committer ou de recopier les modeles pendant le build Vite. En
 developpement, le middleware Vite expose ces fichiers sous
-`/models/rmbg1.4/*.onnx` et `/models/rmbg2/*.onnx`.
+`/models/rmbg1.4/*.onnx`.
 
 Pour un deploiement statique, vous devez fournir le modele vous-meme a l'URL
-`/models/rmbg1.4/<nom-du-modele>.onnx` ou
-`/models/rmbg2/<nom-du-modele>.onnx`, ou configurer une autre URL de modele
-dans `src/background/rmbg2-config.ts` avant build. Le depot ne telecharge pas
-le modele et n'utilise pas Git LFS.
+`/models/rmbg1.4/<nom-du-modele>.onnx`, ou configurer une autre URL de modele
+dans `src/background/rmbg-config.ts` avant build. Le depot ne telecharge pas le
+modele et n'utilise pas Git LFS.
 
-Pour RMBG-2.0, le fichier full `model.onnx` d'environ 1 Go est deconseille dans
-le navigateur, sauf test avance. Il peut provoquer des erreurs ONNX Runtime Web
-selon l'export, par exemple des erreurs de shape inference.
-
-BRIA RMBG-2.0 est soumis à licence. Vérifier les conditions d’usage, notamment
-commercial, avant utilisation réelle.
+BRIA RMBG-1.4 est soumis a licence. Verifier les conditions d'usage, notamment
+commercial, avant utilisation reelle.
 
 ### Backends fond
 
@@ -404,9 +375,9 @@ Verifier :
 
 - `local-models/rmbg1.4/model_fp16.onnx` existe en developpement pour le moteur
   recommande, ou que le modele selectionne dans l'UI existe dans
-  `local-models/rmbg1.4/` ou `local-models/rmbg2/` ;
-- l'URL `/models/rmbg1.4/model_fp16.onnx`, `/models/rmbg2/model_fp16.onnx` ou
-  celle du modele selectionne ne renvoie pas `text/html` ;
+  `local-models/rmbg1.4/` ;
+- l'URL `/models/rmbg1.4/model_fp16.onnx` ou celle du modele selectionne ne
+  renvoie pas `text/html` ;
 - le fichier n'est pas une page HTML ou un placeholder ;
 - le modele respecte un export ONNX compatible avec ONNX Runtime Web.
 
@@ -435,8 +406,7 @@ rester local.
   administrative d'une photo.
 - La detection visage et la suppression de fond sont des aides ; verifier
   manuellement le menton, les yeux, le sommet du crane, les cheveux et contours.
-- RMBG-1.4 est recommande pour compatibilite web ; RMBG-2.0 reste experimental
-  dans le navigateur.
+- RMBG-1.4 est le seul moteur RMBG conserve dans l'application.
 - Les modeles RMBG peuvent etre lents en CPU.
 - Les cheveux fins, lunettes, accessoires, fonds proches des vetements, ombres
   fortes et photos floues doivent etre controles visuellement.

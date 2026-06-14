@@ -1,3 +1,8 @@
+import {
+  QualityAnalysisSnapshot,
+  QualityCheckStatus,
+} from "./quality-types";
+
 export type ColorCast = "none" | "warm" | "cool" | "green" | "magenta";
 
 export type QualityStatus = "ok" | "warning" | "problem";
@@ -28,6 +33,11 @@ export type QualityEditState = {
   saturation: number;
   sharpness: number;
   diagnostics?: QualityDiagnostics;
+  beforeCorrections?: QualityAnalysisSnapshot;
+  afterCorrections?: QualityAnalysisSnapshot;
+  analysisStatus?: QualityCheckStatus;
+  analysisScore?: number;
+  analysisMessages?: string[];
 };
 
 export const QUALITY_ADJUSTMENT_LIMITS = {

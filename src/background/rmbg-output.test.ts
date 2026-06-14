@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { Rmbg2ModelConfig } from "./rmbg2-config";
-import { extractRmbg2AlphaMask, selectModelTensorName } from "./rmbg2-output";
+import { RmbgModelConfig } from "./rmbg-config";
+import { extractRmbgAlphaMask, selectModelTensorName } from "./rmbg-output";
 
-const TEST_CONFIG: Rmbg2ModelConfig = {
+const TEST_CONFIG: RmbgModelConfig = {
   engine: "rmbg1.4",
   modelPath: "/models/rmbg1.4/model_fp16.onnx",
   ortWasmPath: "/ort/",
@@ -12,11 +12,12 @@ const TEST_CONFIG: Rmbg2ModelConfig = {
     mean: [0.485, 0.456, 0.406],
     std: [0.229, 0.224, 0.225],
   },
+  outputNormalization: "none",
 };
 
 describe("RMBG output extraction", () => {
   it("keeps a progressive float alpha matte", () => {
-    const selection = extractRmbg2AlphaMask(
+    const selection = extractRmbgAlphaMask(
       {
         alpha: {
           data: new Float32Array([0, 0.25, 0.5, 1]),
@@ -35,7 +36,7 @@ describe("RMBG output extraction", () => {
   });
 
   it("normalizes byte-like output to 0..1", () => {
-    const selection = extractRmbg2AlphaMask(
+    const selection = extractRmbgAlphaMask(
       {
         output: {
           data: new Uint8Array([0, 128, 255, 64]),
@@ -49,6 +50,25 @@ describe("RMBG output extraction", () => {
     expect(selection.mask.data[0]).toBe(0);
     expect(selection.mask.data[1]).toBeCloseTo(128 / 255);
     expect(selection.mask.data[2]).toBe(1);
+  });
+
+  it("normalizes RMBG-1.4 logits with min/max before thresholding", () => {
+    const selection = extractRmbgAlphaMask(
+      {
+        output: {
+          data: new Float32Array([-8, -4, 0, 8]),
+          dims: [2, 2],
+        },
+      },
+      ["output"],
+      {
+        ...TEST_CONFIG,
+        engine: "rmbg1.4",
+        outputNormalization: "min-max",
+      },
+    );
+
+    expect([...selection.mask.data]).toEqual([0, 0.25, 0.5, 1]);
   });
 
   it("uses the configured output name when present", () => {
@@ -65,7 +85,7 @@ describe("RMBG output extraction", () => {
 
   it("rejects an unexpected output shape", () => {
     expect(() =>
-      extractRmbg2AlphaMask(
+      extractRmbgAlphaMask(
         {
           output: {
             data: new Float32Array(5),

@@ -1,4 +1,4 @@
-import { RMBG2_DEFAULT_CONFIG, Rmbg2ModelConfig } from "./rmbg2-config";
+import { RMBG_DEFAULT_CONFIG, RmbgModelConfig } from "./rmbg-config";
 
 export type RgbaImageDataLike = {
   width: number;
@@ -6,15 +6,15 @@ export type RgbaImageDataLike = {
   data: Uint8ClampedArray;
 };
 
-export type Rmbg2InputTensorData = {
+export type RmbgInputTensorData = {
   data: Float32Array;
   dims: readonly [1, 3, number, number];
 };
 
-export function preprocessImageDataForRmbg2(
+export function preprocessImageDataForRmbg(
   imageData: RgbaImageDataLike,
-  config: Rmbg2ModelConfig = RMBG2_DEFAULT_CONFIG,
-): Rmbg2InputTensorData {
+  config: RmbgModelConfig = RMBG_DEFAULT_CONFIG,
+): RmbgInputTensorData {
   if (imageData.width !== config.inputWidth || imageData.height !== config.inputHeight) {
     throw new Error(
       `RMBG attend une image ${config.inputWidth}x${config.inputHeight}, recu ${imageData.width}x${imageData.height}.`,
@@ -43,10 +43,10 @@ export function preprocessImageDataForRmbg2(
   };
 }
 
-export function preprocessImageElementForRmbg2(
+export function preprocessImageElementForRmbg(
   image: HTMLImageElement,
-  config: Rmbg2ModelConfig = RMBG2_DEFAULT_CONFIG,
-): Rmbg2InputTensorData {
+  config: RmbgModelConfig = RMBG_DEFAULT_CONFIG,
+): RmbgInputTensorData {
   const canvas = document.createElement("canvas");
   canvas.width = config.inputWidth;
   canvas.height = config.inputHeight;
@@ -55,7 +55,7 @@ export function preprocessImageElementForRmbg2(
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-  return preprocessImageDataForRmbg2(
+  return preprocessImageDataForRmbg(
     context.getImageData(0, 0, canvas.width, canvas.height),
     config,
   );

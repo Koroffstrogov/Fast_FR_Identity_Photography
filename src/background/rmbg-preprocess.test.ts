@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { Rmbg2ModelConfig } from "./rmbg2-config";
-import { preprocessImageDataForRmbg2 } from "./rmbg2-preprocess";
+import { RmbgModelConfig } from "./rmbg-config";
+import { preprocessImageDataForRmbg } from "./rmbg-preprocess";
 
-const TEST_CONFIG: Rmbg2ModelConfig = {
+const TEST_CONFIG: RmbgModelConfig = {
   engine: "rmbg1.4",
   modelPath: "/models/rmbg1.4/model_fp16.onnx",
   ortWasmPath: "/ort/",
@@ -12,11 +12,12 @@ const TEST_CONFIG: Rmbg2ModelConfig = {
     mean: [0.5, 0.25, 0],
     std: [0.5, 0.25, 1],
   },
+  outputNormalization: "min-max",
 };
 
 describe("RMBG preprocessing", () => {
   it("converts RGBA pixels to normalized NCHW float32 RGB", () => {
-    const tensor = preprocessImageDataForRmbg2(
+    const tensor = preprocessImageDataForRmbg(
       {
         width: 2,
         height: 1,
@@ -39,7 +40,7 @@ describe("RMBG preprocessing", () => {
 
   it("rejects an unexpected input size", () => {
     expect(() =>
-      preprocessImageDataForRmbg2(
+      preprocessImageDataForRmbg(
         {
           width: 1,
           height: 1,

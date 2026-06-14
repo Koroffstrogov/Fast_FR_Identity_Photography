@@ -9,44 +9,41 @@ import {
   createConfiguredOnnxSession,
 } from "../ai/onnx-session";
 import {
-  RMBG2_DEFAULT_CONFIG,
-  Rmbg2ModelConfig,
+  RMBG_DEFAULT_CONFIG,
+  RmbgModelConfig,
   getRmbgEngineLabel,
-} from "./rmbg2-config";
+} from "./rmbg-config";
 import {
   BackgroundRemovalResult,
   BackgroundRemovalRunner,
 } from "./background-removal-runner";
-import { preprocessImageElementForRmbg2 } from "./rmbg2-preprocess";
-import {
-  extractRmbg2AlphaMask,
-  selectModelTensorName,
-} from "./rmbg2-output";
+import { preprocessImageElementForRmbg } from "./rmbg-preprocess";
+import { extractRmbgAlphaMask, selectModelTensorName } from "./rmbg-output";
 
 type LoadedSession = {
   backendPreference: BackgroundRemovalBackendPreference;
-  config: Rmbg2ModelConfig;
+  config: RmbgModelConfig;
   session: OnnxSessionLike;
   diagnostics: BackgroundTechnicalDiagnostics;
 };
 
-export type Rmbg2RunnerOptions = {
-  config?: Rmbg2ModelConfig;
+export type RmbgRunnerOptions = {
+  config?: RmbgModelConfig;
   runtime?: OnnxRuntimeApi;
   now?: () => number;
 };
 
-export class Rmbg2BackgroundRemovalRunner implements BackgroundRemovalRunner {
-  private readonly defaultConfig: Rmbg2ModelConfig;
+export class RmbgBackgroundRemovalRunner implements BackgroundRemovalRunner {
+  private readonly defaultConfig: RmbgModelConfig;
   private readonly runtime: OnnxRuntimeApi;
   private readonly now: () => number;
   private loadedSession: LoadedSession | null = null;
 
   constructor({
-    config = RMBG2_DEFAULT_CONFIG,
+    config = RMBG_DEFAULT_CONFIG,
     runtime = getOrtRuntime(),
     now = defaultNow,
-  }: Rmbg2RunnerOptions = {}) {
+  }: RmbgRunnerOptions = {}) {
     this.defaultConfig = config;
     this.runtime = runtime;
     this.now = now;
@@ -96,7 +93,7 @@ export class Rmbg2BackgroundRemovalRunner implements BackgroundRemovalRunner {
       throw new Error(`Session ${getRmbgEngineLabel(config.engine)} non initialisee.`);
     }
 
-    const input = preprocessImageElementForRmbg2(image, config);
+    const input = preprocessImageElementForRmbg(image, config);
     const inputName = selectModelTensorName(
       loadedSession.session.inputNames,
       config.modelInputName,
@@ -106,7 +103,7 @@ export class Rmbg2BackgroundRemovalRunner implements BackgroundRemovalRunner {
     const tensor = this.createTensor(input.data, input.dims);
     const outputs = await loadedSession.session.run({ [inputName]: tensor });
     const inferenceMs = Math.round(this.now() - startedAt);
-    const outputSelection = extractRmbg2AlphaMask(
+    const outputSelection = extractRmbgAlphaMask(
       outputs,
       loadedSession.session.outputNames,
       config,

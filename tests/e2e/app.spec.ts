@@ -51,12 +51,15 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   await expect(page.getByText("2 images importees.")).toBeVisible();
   await expect(page.getByText("2 photos / 30 places")).toBeVisible();
   await expect(canvas).toBeVisible();
+  await expect(page.getByRole("button", { name: "Replier" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ouvrir" })).toBeVisible();
 
   await page.getByRole("textbox", { name: "Prenom alice.png", exact: true }).fill("Alice");
   await page.getByRole("textbox", { name: "Nom alice.png", exact: true }).fill("Dupont");
   await page.getByLabel("Usage alice.png").selectOption("college");
   await page.getByRole("button", { name: "Generer nom affiche" }).first().click();
 
+  await page.getByRole("button", { name: "Ouvrir" }).click();
   await page.getByRole("textbox", { name: "Prenom bob.png", exact: true }).fill("Éléa");
   await page.getByRole("textbox", { name: "Nom bob.png", exact: true }).fill("Sport");
   await page.getByLabel("Usage bob.png").selectOption("sport");
@@ -155,29 +158,25 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   await page.getByRole("button", { name: "Fond", exact: true }).click();
   await expect(canvas).toBeVisible();
   const backgroundGroup = page.getByRole("group", { name: "Fond" });
-  await page.route(/\/models\/rmbg(1\.4|2)\/.*\.onnx.*/, async (route) => {
+  await page.route(/\/models\/rmbg1\.4\/.*\.onnx.*/, async (route) => {
     await route.fulfill({
       status: 404,
       contentType: "text/plain",
       body: "missing model",
     });
   });
-  await expect(page.getByLabel("Moteur fond")).toHaveValue("rmbg1.4");
   await expect(
     backgroundGroup.locator(".model-status").filter({ hasText: "RMBG-1.4 ONNX" }),
   ).toBeVisible();
+  await expect(backgroundGroup.getByText("Options avancees")).toBeVisible();
+  await backgroundGroup.getByText("Options avancees").click();
   await expect(page.getByLabel("Modele RMBG")).toHaveValue(
     "/models/rmbg1.4/model_fp16.onnx",
   );
-  await page.getByLabel("Moteur fond").selectOption("rmbg2");
-  await expect(page.getByLabel("Modele RMBG")).toHaveValue(
-    "/models/rmbg2/model_fp16.onnx",
-  );
-  await page.getByLabel("Moteur fond").selectOption("rmbg1.4");
   await expect(page.getByLabel("Backend fond")).toHaveValue("auto");
   await expect(backgroundGroup.getByRole("button", { name: "Supprimer le fond" })).toBeVisible();
   await backgroundGroup.getByRole("button", { name: "Charger / verifier le modele" }).click();
-  await expect(page.getByText(/Modele RMBG-(1\.4|2\.0).*introuvable|Le chemin du modele renvoie l'application HTML/).first()).toBeVisible();
+  await expect(page.getByText(/Modele RMBG-1\.4.*introuvable|Le chemin du modele renvoie l'application HTML/).first()).toBeVisible();
   await page.getByLabel("Remplacer le fond dans les exports").check();
   await expect(page.getByLabel("Remplacer le fond dans les exports")).toBeChecked();
   await page.getByLabel("Couleur de fond").evaluate((input) => {
@@ -205,9 +204,14 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   await page.getByRole("button", { name: "Qualite", exact: true }).click();
   await expect(canvas).toBeVisible();
   await expect(page.getByRole("group", { name: "Diagnostic qualite" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Avant / apres corrections" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Avant corrections" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Apres corrections" })).toBeVisible();
+  await expect(page.getByText(/Conforme probable|A surveiller|A corriger/).first()).toBeVisible();
   await expect(
     page.getByText("Diagnostic indicatif, ne garantit pas l'acceptation officielle."),
   ).toBeVisible();
+  await expect(page.getByText(/Fond|fond/).first()).toBeVisible();
   await page.getByRole("button", { name: "Amelioration auto legere" }).click();
   await expect(page.getByLabel("Apercu corrige exporte")).toBeVisible();
   await page.getByRole("button", { name: "Reinitialiser qualite" }).click();

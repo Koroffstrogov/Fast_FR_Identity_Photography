@@ -163,7 +163,7 @@ export function parseHexColor(hexColor: string): RgbColor {
   };
 }
 
-function renderMaskToTargetAlpha(
+export function renderMaskToTargetAlpha(
   rawMask: BackgroundMaskData,
   targetCanvas: HTMLCanvasElement,
   imageSize: Size,

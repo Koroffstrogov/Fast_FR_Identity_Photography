@@ -53,9 +53,11 @@ import {
   downloadPhotoExports,
   exportIndividualPhotoBlobs,
 } from "../export/export-batch";
-import { createPhotosZip, downloadZip } from "../export/export-zip";
 import { openA4PrintPage } from "../print/open-print-page";
-import { analyzeRenderedPhotoQuality } from "../quality/analyze-photo-quality";
+import {
+  analyzeRenderedPhotoQuality,
+  analyzeRenderedPhotoQualityBeforeAfter,
+} from "../quality/analyze-photo-quality";
 import { createAutoQualityEdit } from "../quality/auto-quality";
 import {
   QualityEditState,
@@ -77,10 +79,10 @@ import {
   removeImageBackground,
 } from "../background/background-removal";
 import {
-  createRmbg2ConfigForModelPath,
+  createRmbgConfigForModelPath,
   getRmbgEngineLabel,
-} from "../background/rmbg2-config";
-import { diagnoseOnnxSessionCreation } from "../ai/onnx-session-diagnostics";
+  normalizeRmbgModelPath,
+} from "../background/rmbg-config";
 import { analyzeFaceLandmarks } from "../vision/face-landmarks";
 import {
   createFacePointsFromCandidate,
@@ -260,6 +262,14 @@ export function App() {
     activePhoto?.backgroundEdit?.preserveHair,
     activePhoto?.backgroundEdit?.maskVersion,
     activePhoto?.backgroundEdit?.rawMask,
+    activePhoto?.qualityEdit?.enabled,
+    activePhoto?.qualityEdit?.exposureEv,
+    activePhoto?.qualityEdit?.brightness,
+    activePhoto?.qualityEdit?.contrast,
+    activePhoto?.qualityEdit?.temperature,
+    activePhoto?.qualityEdit?.tint,
+    activePhoto?.qualityEdit?.saturation,
+    activePhoto?.qualityEdit?.sharpness,
   ]);
 
   useEffect(() => {
@@ -317,12 +327,18 @@ export function App() {
   function updatePhotoQualityDiagnostics(photo: PhotoItem) {
     try {
       const diagnostics = analyzeRenderedPhotoQuality(photo);
+      const beforeAfter = analyzeRenderedPhotoQualityBeforeAfter(photo);
 
       updatePhoto(photo.id, (currentPhoto) => ({
         ...currentPhoto,
         qualityEdit: {
           ...(currentPhoto.qualityEdit ?? getDefaultQualityEditState()),
           diagnostics,
+          beforeCorrections: beforeAfter.beforeCorrections,
+          afterCorrections: beforeAfter.afterCorrections,
+          analysisStatus: beforeAfter.status,
+          analysisScore: beforeAfter.score,
+          analysisMessages: beforeAfter.messages,
         },
       }));
     } catch (qualityError) {
@@ -381,7 +397,14 @@ export function App() {
     updateActivePhoto((photo) => {
       const qualityEdit = photo.qualityEdit ?? getDefaultQualityEditState();
       const changesAdjustments = Object.keys(partialEdit).some(
-        (key) => key !== "enabled" && key !== "diagnostics",
+        (key) =>
+          key !== "enabled" &&
+          key !== "diagnostics" &&
+          key !== "beforeCorrections" &&
+          key !== "afterCorrections" &&
+          key !== "analysisStatus" &&
+          key !== "analysisScore" &&
+          key !== "analysisMessages",
       );
 
       return {
@@ -435,12 +458,18 @@ export function App() {
 
     try {
       const diagnostics = analyzeRenderedPhotoQuality(photo);
+      const beforeAfter = analyzeRenderedPhotoQualityBeforeAfter(photo);
 
       updatePhoto(photo.id, (currentPhoto) => ({
         ...currentPhoto,
         qualityEdit: {
           ...getDefaultQualityEditState(),
           diagnostics,
+          beforeCorrections: beforeAfter.beforeCorrections,
+          afterCorrections: beforeAfter.afterCorrections,
+          analysisStatus: beforeAfter.status,
+          analysisScore: beforeAfter.score,
+          analysisMessages: beforeAfter.messages,
         },
       }));
       setError("");
@@ -704,7 +733,7 @@ export function App() {
     }
 
     const backgroundEdit = photo.backgroundEdit ?? getDefaultBackgroundEditState();
-    const modelConfig = createRmbg2ConfigForModelPath(backgroundEdit.modelPath);
+    const modelConfig = createRmbgConfigForModelPath(backgroundEdit.modelPath);
 
     setBackgroundRemovalStatus("loading");
     setBackgroundRemovalError("");
@@ -720,7 +749,7 @@ export function App() {
         backgroundEdit: {
           ...(currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState()),
           engine: diagnostics.engine,
-          modelPath: backgroundEdit.modelPath,
+          modelPath: modelConfig.modelPath,
           activeBackend: diagnostics.activeBackend,
           technicalDiagnostics: diagnostics,
           message:
@@ -768,6 +797,9 @@ export function App() {
     setBackgroundRemovalError("");
 
     try {
+      const { diagnoseOnnxSessionCreation } = await import(
+        "../ai/onnx-session-diagnostics"
+      );
       const results = await diagnoseOnnxSessionCreation(backgroundEdit.modelPath);
       const message = getOnnxSessionDiagnosticSummary(results);
 
@@ -814,7 +846,7 @@ export function App() {
       photo.backgroundEdit?.backendPreference ??
       getDefaultBackgroundEditState().backendPreference;
     const backgroundEdit = photo.backgroundEdit ?? getDefaultBackgroundEditState();
-    const modelConfig = createRmbg2ConfigForModelPath(backgroundEdit.modelPath);
+    const modelConfig = createRmbgConfigForModelPath(backgroundEdit.modelPath);
 
     updatePhoto(photo.id, (currentPhoto) => ({
       ...currentPhoto,
@@ -846,6 +878,7 @@ export function App() {
           backgroundEdit: {
             ...backgroundEdit,
             engine: modelConfig.engine,
+            modelPath: modelConfig.modelPath,
             enabled: true,
             activeBackend: result.diagnostics.activeBackend,
             mode: "replace",
@@ -882,10 +915,18 @@ export function App() {
   function handleBackgroundChange(
     partialEdit: Partial<NonNullable<PhotoItem["backgroundEdit"]>>,
   ) {
+    const normalizedPartialEdit = {
+      ...partialEdit,
+      ...(partialEdit.engine !== undefined ? { engine: "rmbg1.4" as const } : {}),
+      ...(partialEdit.modelPath !== undefined
+        ? { modelPath: normalizeRmbgModelPath(partialEdit.modelPath) }
+        : {}),
+    };
+
     if (
-      partialEdit.backendPreference !== undefined ||
-      partialEdit.engine !== undefined ||
-      partialEdit.modelPath !== undefined
+      normalizedPartialEdit.backendPreference !== undefined ||
+      normalizedPartialEdit.engine !== undefined ||
+      normalizedPartialEdit.modelPath !== undefined
     ) {
       setBackgroundRemovalStatus("idle");
       setBackgroundRemovalError("");
@@ -894,11 +935,12 @@ export function App() {
     updateActivePhoto((photo) => {
       const backgroundEdit = photo.backgroundEdit ?? getDefaultBackgroundEditState();
       const modelChanged =
-        partialEdit.modelPath !== undefined &&
-        partialEdit.modelPath !== backgroundEdit.modelPath;
+        normalizedPartialEdit.modelPath !== undefined &&
+        normalizeRmbgModelPath(normalizedPartialEdit.modelPath) !==
+          normalizeRmbgModelPath(backgroundEdit.modelPath);
       const engineChanged =
-        partialEdit.engine !== undefined &&
-        partialEdit.engine !== backgroundEdit.engine;
+        normalizedPartialEdit.engine !== undefined &&
+        normalizedPartialEdit.engine !== backgroundEdit.engine;
 
       return {
         ...photo,
@@ -915,7 +957,7 @@ export function App() {
                 message: "Moteur ou modele RMBG change. Rechargez le modele avant inference.",
               }
             : {}),
-          ...partialEdit,
+          ...normalizedPartialEdit,
         },
       };
     });
@@ -1313,6 +1355,7 @@ export function App() {
 
     try {
       const exports = await exportIndividualPhotoBlobs(photos, fileNamingTemplate);
+      const { createPhotosZip, downloadZip } = await import("../export/export-zip");
       const zipBlob = await createPhotosZip(exports);
       downloadZip(zipBlob, buildZipFileName());
       setError("");
@@ -1590,7 +1633,7 @@ function getOnnxSessionDiagnosticSummary(
     "Le modele est charge, mais aucune variante ONNX Runtime Web ne cree la session.",
     "Le modele est valide ONNX cote Python, mais incompatible avec ONNX Runtime Web dans cette forme.",
     firstError ? `Erreur representative : ${firstError}` : "",
-    "Pistes suivantes : tester un autre modele RMBG-1.4, tester model_quantized.onnx, tester model_uint8.onnx pour RMBG-2.0, convertir en format .ort, tester une autre version de onnxruntime-web ou un autre export ONNX compatible navigateur.",
+    "Pistes suivantes : tester un autre modele RMBG-1.4, tester model_quantized.onnx, convertir en format .ort, tester une autre version de onnxruntime-web ou un autre export ONNX compatible navigateur.",
   ]
     .filter(Boolean)
     .join(" ");

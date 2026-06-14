@@ -3,36 +3,17 @@ import { resolve } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 
-export const RMBG14_MODEL_DEV_DIRECTORY = "/models/rmbg1.4/";
-export const RMBG14_MODEL_DEV_ROUTE = "/models/rmbg1.4/model_fp16.onnx";
-export const RMBG14_LOCAL_MODEL_DIRECTORY = "local-models/rmbg1.4";
-export const RMBG14_LOCAL_MODEL_RELATIVE_PATH =
+export const RMBG_MODEL_DEV_DIRECTORY = "/models/rmbg1.4/";
+export const RMBG_MODEL_DEV_ROUTE = "/models/rmbg1.4/model_fp16.onnx";
+export const RMBG_LOCAL_MODEL_DIRECTORY = "local-models/rmbg1.4";
+export const RMBG_LOCAL_MODEL_RELATIVE_PATH =
   "local-models/rmbg1.4/model_fp16.onnx";
 
-export const RMBG2_MODEL_DEV_DIRECTORY = "/models/rmbg2/";
-export const RMBG2_MODEL_DEV_ROUTE = "/models/rmbg2/model_fp16.onnx";
-export const RMBG2_LOCAL_MODEL_DIRECTORY = "local-models/rmbg2";
-export const RMBG2_LOCAL_MODEL_RELATIVE_PATH =
-  "local-models/rmbg2/model_fp16.onnx";
-
-type RmbgModelEngineRoute = "rmbg1.4" | "rmbg2";
-
 type RmbgModelRequest = {
-  engine: RmbgModelEngineRoute;
   fileName: string;
 };
 
 type NextFunction = () => void;
-
-const LOCAL_MODEL_DIRECTORIES: Record<RmbgModelEngineRoute, string> = {
-  "rmbg1.4": RMBG14_LOCAL_MODEL_DIRECTORY,
-  rmbg2: RMBG2_LOCAL_MODEL_DIRECTORY,
-};
-
-const ENGINE_LABELS: Record<RmbgModelEngineRoute, string> = {
-  "rmbg1.4": "RMBG-1.4",
-  rmbg2: "RMBG-2.0",
-};
 
 export function rmbgLocalModelPlugin(root = process.cwd()): Plugin {
   return {
@@ -43,8 +24,6 @@ export function rmbgLocalModelPlugin(root = process.cwd()): Plugin {
     },
   };
 }
-
-export const rmbg2LocalModelPlugin = rmbgLocalModelPlugin;
 
 export function createRmbgModelMiddleware(root: string) {
   return (
@@ -74,7 +53,7 @@ export function createRmbgModelMiddleware(root: string) {
         respondText(
           response,
           404,
-          `Modele ${localModelPath.engineLabel} introuvable. Placez le fichier dans ${localModelPath.relativePath}.`,
+          `Modele RMBG-1.4 introuvable. Placez le fichier dans ${localModelPath.relativePath}.`,
         );
         return;
       }
@@ -103,49 +82,43 @@ export function createRmbgModelMiddleware(root: string) {
   };
 }
 
-export const createRmbg2ModelMiddleware = createRmbgModelMiddleware;
-
 export function isRmbgModelRequest(requestUrl: string): boolean {
   return getRmbgModelRequest(requestUrl) !== null;
 }
 
-export const isRmbg2ModelRequest = isRmbgModelRequest;
-
 function getLocalModelPath(
   root: string,
   requestUrl: string,
-): { absolutePath: string; relativePath: string; engineLabel: string } | null {
+): { absolutePath: string; relativePath: string } | null {
   const modelRequest = getRmbgModelRequest(requestUrl);
 
   if (!modelRequest) {
     return null;
   }
 
-  const relativePath = `${LOCAL_MODEL_DIRECTORIES[modelRequest.engine]}/${modelRequest.fileName}`;
+  const relativePath = `${RMBG_LOCAL_MODEL_DIRECTORY}/${modelRequest.fileName}`;
 
   return {
     absolutePath: resolve(root, relativePath),
     relativePath,
-    engineLabel: ENGINE_LABELS[modelRequest.engine],
   };
 }
 
 function getRmbgModelRequest(requestUrl: string): RmbgModelRequest | null {
   const pathname = new URL(requestUrl, "http://localhost").pathname;
-  const match = /^\/models\/(rmbg1\.4|rmbg2)\/([^/]+)$/.exec(pathname);
+  const match = /^\/models\/rmbg1\.4\/([^/]+)$/.exec(pathname);
 
   if (!match) {
     return null;
   }
 
-  const engine = match[1] as RmbgModelEngineRoute;
-  const fileName = decodeURIComponent(match[2]);
+  const fileName = decodeURIComponent(match[1]);
 
   if (!/^[A-Za-z0-9_.-]+\.onnx$/.test(fileName)) {
     return null;
   }
 
-  return { engine, fileName };
+  return { fileName };
 }
 
 function respondText(response: ServerResponse, statusCode: number, body: string): void {

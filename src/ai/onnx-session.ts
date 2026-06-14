@@ -15,11 +15,11 @@ import {
   resolveBackgroundBackend,
 } from "./runtime-capabilities";
 import {
-  Rmbg2ModelConfig,
-  RMBG2_DEFAULT_CONFIG,
+  RmbgModelConfig,
+  RMBG_DEFAULT_CONFIG,
   getRmbgEngineLabel,
   getRmbgLocalModelPath,
-} from "../background/rmbg2-config";
+} from "../background/rmbg-config";
 
 export type { OnnxRuntimeApi, OnnxSessionLike, OnnxTensorLike };
 
@@ -61,7 +61,7 @@ export type LoadedOnnxModel = {
 
 export type CreateOnnxSessionOptions = {
   backendPreference: BackgroundRemovalBackendPreference;
-  config?: Rmbg2ModelConfig;
+  config?: RmbgModelConfig;
   runtime?: OnnxRuntimeApi;
   fetchModel?: typeof fetch;
   modelBytes?: Uint8Array;
@@ -72,7 +72,7 @@ const MIN_ONNX_MODEL_SIZE_BYTES = 1024;
 
 export async function createConfiguredOnnxSession({
   backendPreference,
-  config = RMBG2_DEFAULT_CONFIG,
+  config = RMBG_DEFAULT_CONFIG,
   runtime = getOrtRuntime(),
   fetchModel = fetch,
   modelBytes,
@@ -250,7 +250,7 @@ function createBaseDiagnostics({
   provider,
 }: {
   backendPreference: BackgroundRemovalBackendPreference;
-  config: Rmbg2ModelConfig;
+  config: RmbgModelConfig;
   loadedModel: LoadedOnnxModel;
   provider: string;
 }): BackgroundTechnicalDiagnostics {
@@ -397,10 +397,8 @@ function defaultNow(): number {
   return typeof performance === "undefined" ? Date.now() : performance.now();
 }
 
-function getRmbgEngineLabelFromModelPath(modelPath: string): string {
-  return getRmbgEngineLabel(
-    modelPath.includes("/rmbg2/") ? "rmbg2" : "rmbg1.4",
-  );
+function getRmbgEngineLabelFromModelPath(_modelPath: string): string {
+  return getRmbgEngineLabel("rmbg1.4");
 }
 
 function logOrtRuntimeConfig(runtime: OnnxRuntimeApi): void {

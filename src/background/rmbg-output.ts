@@ -1,8 +1,8 @@
 import { BackgroundMaskData } from "../core/photo-project";
 import { OnnxTensorLike } from "../ai/onnx-session";
-import { RMBG2_DEFAULT_CONFIG, Rmbg2ModelConfig } from "./rmbg2-config";
+import { RMBG_DEFAULT_CONFIG, RmbgModelConfig } from "./rmbg-config";
 
-export type Rmbg2OutputSelection = {
+export type RmbgOutputSelection = {
   outputName: string;
   mask: BackgroundMaskData;
 };
@@ -36,11 +36,11 @@ export function selectModelTensorName(
   return firstName;
 }
 
-export function extractRmbg2AlphaMask(
+export function extractRmbgAlphaMask(
   outputs: Record<string, OnnxTensorLike>,
   outputNames: readonly string[],
-  config: Rmbg2ModelConfig = RMBG2_DEFAULT_CONFIG,
-): Rmbg2OutputSelection {
+  config: RmbgModelConfig = RMBG_DEFAULT_CONFIG,
+): RmbgOutputSelection {
   const outputName = selectModelTensorName(
     outputNames,
     config.modelOutputName,
@@ -61,12 +61,10 @@ export function extractRmbg2AlphaMask(
   }
 
   const shape = getSingleChannelShape(output.dims, values.length, config);
-  const maskData = new Float32Array(values.length);
-  const scale = shouldNormalizeByteLikeValues(values) ? 255 : 1;
-
-  for (let index = 0; index < values.length; index += 1) {
-    maskData[index] = clamp01(Number(values[index]) / scale);
-  }
+  const maskData =
+    config.outputNormalization === "min-max"
+      ? normalizeValuesByMinMax(values)
+      : normalizeValuesByScale(values);
 
   return {
     outputName,
@@ -102,7 +100,7 @@ function getNumericTensorValues(output: OnnxTensorLike): ArrayLike<number> {
 function getSingleChannelShape(
   dims: readonly number[],
   valueCount: number,
-  config: Rmbg2ModelConfig,
+  config: RmbgModelConfig,
 ): SingleChannelShape {
   if (dims.length === 4) {
     const [n, cOrH, hOrW, wOrC] = dims;
@@ -151,6 +149,46 @@ function shouldNormalizeByteLikeValues(values: ArrayLike<number>): boolean {
   }
 
   return false;
+}
+
+function normalizeValuesByScale(values: ArrayLike<number>): Float32Array {
+  const maskData = new Float32Array(values.length);
+  const scale = shouldNormalizeByteLikeValues(values) ? 255 : 1;
+
+  for (let index = 0; index < values.length; index += 1) {
+    maskData[index] = clamp01(Number(values[index]) / scale);
+  }
+
+  return maskData;
+}
+
+function normalizeValuesByMinMax(values: ArrayLike<number>): Float32Array {
+  const maskData = new Float32Array(values.length);
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+
+  for (let index = 0; index < values.length; index += 1) {
+    const value = Number(values[index]);
+
+    if (!Number.isFinite(value)) {
+      continue;
+    }
+
+    min = Math.min(min, value);
+    max = Math.max(max, value);
+  }
+
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) {
+    return maskData;
+  }
+
+  const range = max - min;
+
+  for (let index = 0; index < values.length; index += 1) {
+    maskData[index] = clamp01((Number(values[index]) - min) / range);
+  }
+
+  return maskData;
 }
 
 function clamp01(value: number): number {
