@@ -57,13 +57,13 @@ export async function detectFaceLandmarks(
 export function getFaceLandmarkerErrorMessage(error: unknown): string {
   const detail = error instanceof Error ? error.message : String(error);
 
-  if (detail.startsWith("Impossible de charger le modele visage local.")) {
+  if (detail.startsWith("Impossible de charger le modèle visage local.")) {
     return detail;
   }
 
   return [
-    "Impossible de charger le modele visage local.",
-    `Verifiez la presence de ${FACE_LANDMARKER_MODEL_PATH} et des fichiers WASM dans ${FACE_LANDMARKER_WASM_PATH}.`,
+    "Impossible de charger le modèle visage local.",
+    `Vérifiez la présence de ${FACE_LANDMARKER_MODEL_PATH} et des fichiers WASM dans ${FACE_LANDMARKER_WASM_PATH}.`,
     detail,
   ].join(" ");
 }
@@ -110,7 +110,7 @@ async function loadFaceLandmarkerModelHeader(): Promise<void> {
 
   if (!response.ok) {
     throw new Error(
-      `Le fichier modele est introuvable : ${FACE_LANDMARKER_MODEL_PATH} (HTTP ${response.status}).`,
+      `Le fichier modèle est introuvable : ${FACE_LANDMARKER_MODEL_PATH} (HTTP ${response.status}).`,
     );
   }
 
@@ -122,19 +122,19 @@ async function loadFaceLandmarkerModelHeader(): Promise<void> {
 
   if (contentType.includes("text/html") || looksLikeHtml(modelHeader)) {
     throw new Error(
-      `Le chemin ${FACE_LANDMARKER_MODEL_PATH} renvoie une page HTML au lieu du modele .task.`,
+      `Le chemin ${FACE_LANDMARKER_MODEL_PATH} renvoie une page HTML au lieu du modèle .task.`,
     );
   }
 
   if (declaredSize !== undefined && declaredSize < MIN_MODEL_SIZE_BYTES) {
     throw new Error(
-      `Le fichier modele ${FACE_LANDMARKER_MODEL_PATH} est trop petit (${declaredSize} octets). Il est probablement incomplet.`,
+      `Le fichier modèle ${FACE_LANDMARKER_MODEL_PATH} est trop petit (${declaredSize} octets). Il est probablement incomplet.`,
     );
   }
 
   if (!hasZipMagicNearStart(modelHeader)) {
     throw new Error(
-      `Le fichier modele ${FACE_LANDMARKER_MODEL_PATH} n'a pas le format MediaPipe attendu.`,
+      `Le fichier modèle ${FACE_LANDMARKER_MODEL_PATH} n'a pas le format MediaPipe attendu.`,
     );
   }
 }

@@ -15,6 +15,7 @@ import {
   QualitySnapshotKind,
   renderQualitySnapshotToCanvas,
 } from "../quality/photo-quality";
+import { ButtonIcon } from "./icons";
 
 type QualityPanelProps = {
   photo: PhotoItem | null;
@@ -38,14 +39,14 @@ export function QualityPanel({
   return (
     <div className="inspector-stack quality-panel-stack">
       <fieldset className="quality-panel">
-        <legend>Diagnostic qualite</legend>
+        <legend>Diagnostic qualité</legend>
         {after ? (
           <div className="quality-v2-summary">
             <div className={`quality-score-card status-${edit.analysisStatus ?? after.status}`}>
               <span>{getStructuredStatusLabel(edit.analysisStatus ?? after.status)}</span>
               <strong>{edit.analysisScore ?? after.score}/100</strong>
             </div>
-            <ul className="quality-advice-list" aria-label="Synthese qualite">
+            <ul className="quality-advice-list" aria-label="Synthèse qualité">
               {(edit.analysisMessages ?? after.messages).slice(0, 3).map((message) => (
                 <li key={message}>{message}</li>
               ))}
@@ -57,40 +58,53 @@ export function QualityPanel({
           </div>
         )}
         <div className="button-row">
-          <button type="button" onClick={onRecalculateQuality} disabled={!photo}>
-            Recalculer diagnostic
+          <button
+            type="button"
+            className="button-with-icon"
+            onClick={onRecalculateQuality}
+            disabled={!photo}
+            aria-describedby="quality-refresh-help"
+          >
+            <ButtonIcon name="refresh" />
+            Actualiser l'analyse avant/après
           </button>
-          <button type="button" onClick={onAutoQuality} disabled={!photo}>
-            Amelioration auto legere
+          <button type="button" className="button-with-icon" onClick={onAutoQuality} disabled={!photo}>
+            <ButtonIcon name="sparkles" />
+            Amélioration auto légère
           </button>
         </div>
+        <p id="quality-refresh-help" className="manual-note">
+          Relance les mesures sur le cadrage actuel et sur le rendu final exportable,
+          utile après un changement de fond, de cadrage ou de correction.
+        </p>
       </fieldset>
 
       <fieldset className="quality-panel">
-        <legend>Avant / apres corrections</legend>
-        <div className="quality-snapshot-grid">
+        <legend>Avant / après corrections</legend>
+        <div className="quality-snapshot-stack">
           <QualitySnapshotCard
             title="Avant corrections"
-            canvasLabel="Apercu original sans correction qualite"
+            canvasLabel="Aperçu original sans correction qualité"
             photo={photo}
             kind="beforeCorrections"
             snapshot={before}
           />
           <QualitySnapshotCard
-            title="Apres corrections"
-            canvasLabel="Apercu corrige exporte"
+            title="Après corrections"
+            canvasLabel="Aperçu corrigé exporté"
             photo={photo}
             kind="afterCorrections"
             snapshot={after}
           />
         </div>
+        <QualityBeforeAfterChecks before={before} after={after} />
         <p className="manual-note">
           Diagnostic indicatif, ne garantit pas l'acceptation officielle.
         </p>
       </fieldset>
 
       <fieldset className="quality-panel">
-        <legend>Corrections legeres</legend>
+        <legend>Corrections légères</legend>
         <label className="check-control">
           <input
             type="checkbox"
@@ -100,7 +114,7 @@ export function QualityPanel({
             }
             disabled={!photo}
           />
-          <span>Appliquer les corrections qualite</span>
+          <span>Appliquer les corrections qualité</span>
         </label>
 
         <QualitySlider
@@ -123,7 +137,7 @@ export function QualityPanel({
           onChange={(contrast) => onQualityChange({ contrast })}
         />
         <QualitySlider
-          label="Temperature"
+          label="Température"
           value={edit.temperature}
           min={QUALITY_ADJUSTMENT_LIMITS.temperature.min}
           max={QUALITY_ADJUSTMENT_LIMITS.temperature.max}
@@ -141,7 +155,7 @@ export function QualityPanel({
           onChange={(saturation) => onQualityChange({ saturation })}
         />
         <QualitySlider
-          label="Nettete"
+          label="Netteté"
           value={edit.sharpness}
           min={QUALITY_ADJUSTMENT_LIMITS.sharpness.min}
           max={QUALITY_ADJUSTMENT_LIMITS.sharpness.max}
@@ -152,11 +166,12 @@ export function QualityPanel({
 
         <button
           type="button"
-          className="secondary-button"
+          className="secondary-button button-with-icon"
           onClick={onResetQuality}
           disabled={!photo}
         >
-          Reinitialiser qualite
+          <ButtonIcon name="reset" />
+          Réinitialiser qualité
         </button>
       </fieldset>
 
@@ -219,31 +234,100 @@ function QualitySnapshotCard({
             <strong>{snapshot.score}/100</strong>
             <small>
               Fond {Math.round(snapshot.measures.backgroundMeanLuminance ?? 0)} lum. ·{" "}
-              {Math.round(snapshot.measures.backgroundUniformityScore ?? 0)} uniformite
+              {Math.round(snapshot.measures.backgroundUniformityScore ?? 0)} uniformité
             </small>
           </div>
-          <ul className="quality-row-list">
-            {snapshot.checks.map((check) => (
-              <QualityCheckRow key={check.id} check={check} />
-            ))}
-          </ul>
         </>
       ) : (
-        <p className="manual-note">Cliquez sur Recalculer diagnostic.</p>
+        <p className="manual-note">Actualisez l'analyse après import et cadrage.</p>
       )}
     </article>
   );
 }
 
-function QualityCheckRow({ check }: { check: QualityCheck }) {
+function QualityBeforeAfterChecks({
+  before,
+  after,
+}: {
+  before: QualityAnalysisSnapshot | undefined;
+  after: QualityAnalysisSnapshot | undefined;
+}) {
+  if (!before || !after) {
+    return (
+      <div className="quality-diagnostics empty-state">
+        Les contrôles avant/après apparaîtront après actualisation de l'analyse.
+      </div>
+    );
+  }
+
+  const checks = getPairedChecks(before, after);
+
   return (
-    <li className={`quality-row status-${check.status}`}>
-      <strong>{check.label}</strong>
-      <span>{check.message}</span>
-      {check.measure && <small>{check.measure}</small>}
-      {check.suggestion && <small>{check.suggestion}</small>}
-    </li>
+    <ul className="quality-comparison-list" aria-label="Contrôles qualité avant après">
+      {checks.map(({ id, label, beforeCheck, afterCheck }) => (
+        <li key={id} className="quality-comparison-item">
+          <strong>{label}</strong>
+          <QualityComparisonState label="Avant" check={beforeCheck} />
+          <QualityComparisonState label="Après" check={afterCheck} />
+        </li>
+      ))}
+    </ul>
   );
+}
+
+function QualityComparisonState({
+  label,
+  check,
+}: {
+  label: "Avant" | "Après";
+  check: QualityCheck | undefined;
+}) {
+  return (
+    <div className={`quality-comparison-state status-${check?.status ?? "pending"}`}>
+      <div className="quality-comparison-state-header">
+        <span>{label}</span>
+        <strong>{check ? getStructuredStatusLabel(check.status) : "En attente"}</strong>
+      </div>
+      {check ? (
+        <>
+          <p>{check.message}</p>
+          {check.measure && <small>{check.measure}</small>}
+          {check.suggestion && <small>{check.suggestion}</small>}
+        </>
+      ) : (
+        <p>Non mesuré.</p>
+      )}
+    </div>
+  );
+}
+
+function getPairedChecks(
+  before: QualityAnalysisSnapshot,
+  after: QualityAnalysisSnapshot,
+): {
+  id: string;
+  label: string;
+  beforeCheck: QualityCheck | undefined;
+  afterCheck: QualityCheck | undefined;
+}[] {
+  const beforeById = new Map(before.checks.map((check) => [check.id, check]));
+  const afterById = new Map(after.checks.map((check) => [check.id, check]));
+  const ids = [
+    ...after.checks.map((check) => check.id),
+    ...before.checks.map((check) => check.id),
+  ];
+
+  return Array.from(new Set(ids)).map((id) => {
+    const beforeCheck = beforeById.get(id);
+    const afterCheck = afterById.get(id);
+
+    return {
+      id,
+      label: afterCheck?.label ?? beforeCheck?.label ?? id,
+      beforeCheck,
+      afterCheck,
+    };
+  });
 }
 
 function getStructuredStatusLabel(status: QualityCheckStatus): string {
@@ -251,15 +335,15 @@ function getStructuredStatusLabel(status: QualityCheckStatus): string {
     case "pass":
       return "Conforme probable";
     case "warning":
-      return "A surveiller";
+      return "À surveiller";
     case "fail":
-      return "A corriger";
+      return "À corriger";
   }
 }
 
 function getQualityAdvice(snapshot: QualityAnalysisSnapshot | undefined): string[] {
   if (!snapshot) {
-    return ["Lancer le diagnostic apres import et cadrage."];
+    return ["Lancer le diagnostic après import et cadrage."];
   }
 
   const failedChecks = new Set(
@@ -277,15 +361,15 @@ function getQualityAdvice(snapshot: QualityAnalysisSnapshot | undefined): string
   }
 
   if (failedChecks.has("backgroundNotPureWhite")) {
-    advice.push("Eviter le blanc pur : choisir gris clair ou bleu clair.");
+    advice.push("Éviter le blanc pur : choisir gris clair ou bleu clair.");
   }
 
   if (failedChecks.has("backgroundColorRecommended")) {
-    advice.push("Remplacer par gris clair si la teinte est jaune ou trop coloree.");
+    advice.push("Remplacer par gris clair si la teinte est jaune ou trop colorée.");
   }
 
   if (failedChecks.has("exposure")) {
-    advice.push("Eclaircir ou assombrir legerement sans bruler le visage.");
+    advice.push("Éclaircir ou assombrir légèrement sans brûler le visage.");
   }
 
   if (failedChecks.has("sharpness")) {

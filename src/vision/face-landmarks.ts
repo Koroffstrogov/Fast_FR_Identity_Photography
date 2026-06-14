@@ -166,7 +166,7 @@ export function analyzeFaceLandmarks(
     diagnostics.push({
       code: "incomplete-landmarks",
       severity: "warning",
-      message: "Certains visages detectes ne contiennent pas assez de points utilisables.",
+      message: "Certains visages détectés ne contiennent pas assez de points utilisables.",
     });
   }
 
@@ -174,7 +174,7 @@ export function analyzeFaceLandmarks(
     diagnostics.push({
       code: "no-face",
       severity: "error",
-      message: "Aucun visage exploitable n'a ete detecte sur la photo active.",
+      message: "Aucun visage exploitable n'a été détecté sur la photo active.",
     });
 
     return {
@@ -188,7 +188,7 @@ export function analyzeFaceLandmarks(
     diagnostics.push({
       code: "multiple-faces",
       severity: "info",
-      message: "Plusieurs visages ont ete detectes ; le plus grand est utilise.",
+      message: "Plusieurs visages ont été détectés ; le plus grand est utilisé.",
     });
   }
 
@@ -255,7 +255,7 @@ function getCandidateDiagnostics({
     diagnostics.push({
       code: "face-too-tilted",
       severity: "warning",
-      message: "Le visage semble incline ; verifiez la rotation proposee.",
+      message: "Le visage semble incliné ; vérifiez la rotation proposée.",
     });
   }
 
@@ -267,7 +267,7 @@ function getCandidateDiagnostics({
     diagnostics.push({
       code: "face-too-small",
       severity: "warning",
-      message: "Le visage detecte occupe peu l'image ; le cadrage peut etre approximatif.",
+      message: "Le visage détecté occupe peu l'image ; le cadrage peut être approximatif.",
     });
   }
 

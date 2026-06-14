@@ -55,8 +55,8 @@ export function formatImportSummary(result: ImageImportResult): string {
   }
 
   if (ignoredCount === 0) {
-    return `${importedCount} image${importedCount > 1 ? "s" : ""} importee${importedCount > 1 ? "s" : ""}.`;
+    return `${importedCount} image${importedCount > 1 ? "s" : ""} importée${importedCount > 1 ? "s" : ""}.`;
   }
 
-  return `${importedCount} image${importedCount > 1 ? "s" : ""} importee${importedCount > 1 ? "s" : ""}, ${ignoredCount} fichier${ignoredCount > 1 ? "s" : ""} ignore${ignoredCount > 1 ? "s" : ""}.`;
+  return `${importedCount} image${importedCount > 1 ? "s" : ""} importée${importedCount > 1 ? "s" : ""}, ${ignoredCount} fichier${ignoredCount > 1 ? "s" : ""} ignoré${ignoredCount > 1 ? "s" : ""}.`;
 }

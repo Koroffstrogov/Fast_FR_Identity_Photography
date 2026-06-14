@@ -51,7 +51,7 @@ export const RMBG_ENGINE_OPTIONS: readonly RmbgEngineOption[] = [
     engine: "rmbg1.4",
     label: RMBG_ENGINE_LABEL,
     shortLabel: "RMBG-1.4",
-    description: "Moteur local recommande pour la compatibilite navigateur.",
+    description: "Moteur local recommandé pour la compatibilité navigateur.",
   },
 ] as const;
 
@@ -63,7 +63,7 @@ export const RMBG_MODEL_OPTIONS: readonly RmbgModelOption[] = [
     label: "Full",
     modelPath: "/models/rmbg1.4/model.onnx",
     localPath: "local-models/rmbg1.4/model.onnx",
-    description: "Modele RMBG-1.4 complet, environ 176 Mo.",
+    description: "Modèle RMBG-1.4 complet, environ 176 Mo.",
   },
   {
     engine: "rmbg1.4",
@@ -72,7 +72,7 @@ export const RMBG_MODEL_OPTIONS: readonly RmbgModelOption[] = [
     label: "FP16",
     modelPath: "/models/rmbg1.4/model_fp16.onnx",
     localPath: "local-models/rmbg1.4/model_fp16.onnx",
-    description: "Modele RMBG-1.4 recommande pour WebGPU, environ 88 Mo.",
+    description: "Modèle RMBG-1.4 recommandé pour WebGPU, environ 88 Mo.",
   },
   {
     engine: "rmbg1.4",
@@ -81,7 +81,7 @@ export const RMBG_MODEL_OPTIONS: readonly RmbgModelOption[] = [
     label: "Quantized",
     modelPath: "/models/rmbg1.4/model_quantized.onnx",
     localPath: "local-models/rmbg1.4/model_quantized.onnx",
-    description: "Modele RMBG-1.4 leger a tester en fallback, environ 44 Mo.",
+    description: "Modèle RMBG-1.4 léger à tester en fallback, environ 44 Mo.",
   },
 ] as const;
 

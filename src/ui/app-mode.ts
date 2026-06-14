@@ -3,7 +3,7 @@ export type AppMode = "crop" | "background" | "quality" | "sheet" | "export";
 export const APP_MODES: { id: AppMode; label: string }[] = [
   { id: "crop", label: "Cadrer" },
   { id: "background", label: "Fond" },
-  { id: "quality", label: "Qualite" },
+  { id: "quality", label: "Qualité" },
   { id: "sheet", label: "Planche" },
   { id: "export", label: "Export" },
 ];

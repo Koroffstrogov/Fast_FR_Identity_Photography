@@ -49,7 +49,7 @@ export function FinalPhotoPreview({ photo }: FinalPhotoPreviewProps) {
         width={FINAL_PHOTO_PREVIEW_SIZE.widthPx}
         height={FINAL_PHOTO_PREVIEW_SIZE.heightPx}
         className="final-preview-canvas"
-        aria-label="Apercu photo finale 35 par 45 millimetres"
+        aria-label="Aperçu photo finale 35 par 45 millimètres"
       />
     </section>
   );

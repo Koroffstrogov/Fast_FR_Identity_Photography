@@ -20,20 +20,20 @@ export function createForegroundMaskFromConfidenceMasks(
   labels: readonly string[],
 ): ForegroundMaskSelection {
   if (masks.length === 0) {
-    throw new Error("Aucun masque de confiance n'a ete retourne par le modele.");
+    throw new Error("Aucun masque de confiance n'a été retourné par le modèle.");
   }
 
   const diagnostics: string[] = [];
   const maskIndex = selectForegroundMaskIndex(labels, masks.length);
 
   if (labels.length === 0) {
-    diagnostics.push("Le modele ne fournit pas de labels ; le premier masque est utilise.");
+    diagnostics.push("Le modèle ne fournit pas de labels ; le premier masque est utilisé.");
   }
 
   const mask = masks[maskIndex];
 
   if (!mask.getAsFloat32Array) {
-    throw new Error("Le masque retourne ne peut pas etre converti en Float32Array.");
+    throw new Error("Le masque retourné ne peut pas être converti en Float32Array.");
   }
 
   return {
@@ -53,14 +53,14 @@ export function createForegroundMaskFromCategoryMask(
   labels: readonly string[],
 ): ForegroundMaskSelection {
   if (!categoryMask.getAsUint8Array) {
-    throw new Error("Le masque de categorie ne peut pas etre converti en Uint8Array.");
+    throw new Error("Le masque de catégorie ne peut pas être converti en Uint8Array.");
   }
 
   const categoryData = categoryMask.getAsUint8Array();
   const foregroundCategories = getForegroundCategoryIndexes(labels);
 
   if (foregroundCategories.length === 0) {
-    throw new Error("Aucune categorie personne exploitable n'a ete trouvee dans le modele.");
+    throw new Error("Aucune catégorie personne exploitable n'a été trouvée dans le modèle.");
   }
 
   const foregroundMask = new Float32Array(categoryData.length);

@@ -4,6 +4,11 @@ import { PhotoItem } from "../core/photo-project";
 import { SheetComposition } from "../core/sheet-items";
 import { PHOTO_FORMAT } from "../core/photo-format";
 import { AppMode, getAppModeLabel } from "./app-mode";
+import {
+  EDITOR_INTERACTION_MODE_MESSAGES,
+  EditorInteractionMode,
+} from "./editor-interaction-mode";
+import { ButtonIcon } from "./icons";
 import { SheetPreview } from "./SheetPreview";
 
 type WorkspaceProps = {
@@ -14,9 +19,13 @@ type WorkspaceProps = {
   sheetCanvasRef: RefObject<HTMLCanvasElement | null>;
   sheetMode: PrintLayoutMode;
   composition: SheetComposition;
+  interactionMode: EditorInteractionMode;
+  isDraggingPhoto: boolean;
+  hasHoveredFacePoint: boolean;
   onPointerDown: PointerEventHandler<HTMLCanvasElement>;
   onPointerMove: PointerEventHandler<HTMLCanvasElement>;
   onPointerEnd: PointerEventHandler<HTMLCanvasElement>;
+  onPointerLeave: PointerEventHandler<HTMLCanvasElement>;
 };
 
 export function Workspace({
@@ -27,9 +36,13 @@ export function Workspace({
   sheetCanvasRef,
   sheetMode,
   composition,
+  interactionMode,
+  isDraggingPhoto,
+  hasHoveredFacePoint,
   onPointerDown,
   onPointerMove,
   onPointerEnd,
+  onPointerLeave,
 }: WorkspaceProps) {
   if (mode === "sheet") {
     return (
@@ -49,7 +62,7 @@ export function Workspace({
       <main className="workspace-panel" aria-label="Espace de travail">
         <section className="export-summary-stage" aria-labelledby="export-summary-title">
           <p className="eyebrow">Sorties</p>
-          <h2 id="export-summary-title">Recapitulatif export</h2>
+          <h2 id="export-summary-title">Récapitulatif export</h2>
           <dl className="export-summary-grid">
             <div>
               <dt>Photo active</dt>
@@ -61,13 +74,23 @@ export function Workspace({
             </div>
             <div>
               <dt>Limite</dt>
-              <dd>{composition.isLimited ? "Capacite depassee" : "OK"}</dd>
+              <dd>{composition.isLimited ? "Capacité dépassée" : "OK"}</dd>
             </div>
           </dl>
         </section>
       </main>
     );
   }
+
+  const canvasClassName = [
+    "photo-canvas",
+    photo ? "is-draggable" : "",
+    photo ? `interaction-${interactionMode}` : "",
+    isDraggingPhoto ? "is-dragging-photo" : "",
+    hasHoveredFacePoint ? "has-hovered-face-point" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <main className="workspace-panel" aria-label="Espace de travail">
@@ -77,36 +100,45 @@ export function Workspace({
             <p className="eyebrow">{getAppModeLabel(mode)}</p>
             <h2 id="photo-stage-title">{photo ? photo.displayName : "Aucune photo"}</h2>
           </div>
-          <button type="button" className="secondary-button stage-fit-button">
-            Ajuster a l'ecran
+          <button type="button" className="secondary-button stage-fit-button button-with-icon">
+            <ButtonIcon name="fit" />
+            Ajuster à l'écran
           </button>
         </div>
 
         <div className="photo-stage-viewport">
-          <div className="canvas-panel photo-stage-canvas-panel">
-            <canvas
-              ref={photoCanvasRef}
-              width={PHOTO_FORMAT.widthPx}
-              height={PHOTO_FORMAT.heightPx}
-              className={photo ? "photo-canvas is-draggable" : "photo-canvas"}
-              aria-label="Apercu photo 35 par 45 millimetres"
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerEnd}
-              onPointerCancel={onPointerEnd}
-            />
-            {!photo && (
-              <div className="canvas-empty" aria-hidden="true">
-                Importez une image
+          <div className="photo-stage-frame">
+            {photo && mode === "crop" && (
+              <div className="interaction-mode-badge" role="status">
+                {EDITOR_INTERACTION_MODE_MESSAGES[interactionMode]}
               </div>
             )}
-            <canvas
-              ref={guideCanvasRef}
-              width={PHOTO_FORMAT.widthPx}
-              height={PHOTO_FORMAT.heightPx}
-              className="guide-canvas"
-              aria-hidden="true"
-            />
+            <div className="canvas-panel photo-stage-canvas-panel">
+              <canvas
+                ref={photoCanvasRef}
+                width={PHOTO_FORMAT.widthPx}
+                height={PHOTO_FORMAT.heightPx}
+                className={canvasClassName}
+                aria-label="Aperçu photo 35 par 45 millimètres"
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerEnd}
+                onPointerCancel={onPointerEnd}
+                onPointerLeave={onPointerLeave}
+              />
+              {!photo && (
+                <div className="canvas-empty" aria-hidden="true">
+                  Importez une image
+                </div>
+              )}
+              <canvas
+                ref={guideCanvasRef}
+                width={PHOTO_FORMAT.widthPx}
+                height={PHOTO_FORMAT.heightPx}
+                className="guide-canvas"
+                aria-hidden="true"
+              />
+            </div>
           </div>
         </div>
       </section>

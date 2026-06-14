@@ -16,7 +16,7 @@ describe("image import", () => {
       },
       async (file) => {
         if (file.type !== "image/png") {
-          throw new Error("Fichier ignore");
+          throw new Error("Fichier ignoré");
         }
 
         return {} as HTMLImageElement;
@@ -28,9 +28,9 @@ describe("image import", () => {
     expect(result.errors).toEqual([
       {
         fileName: "invalid.txt",
-        message: "Fichier ignore",
+        message: "Fichier ignoré",
       },
     ]);
-    expect(formatImportSummary(result)).toBe("1 image importee, 1 fichier ignore.");
+    expect(formatImportSummary(result)).toBe("1 image importée, 1 fichier ignoré.");
   });
 });

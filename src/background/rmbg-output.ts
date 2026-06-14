@@ -20,7 +20,7 @@ export function selectModelTensorName(
   if (configuredName) {
     if (!names.includes(configuredName)) {
       throw new Error(
-        `Nom ${kind} configure introuvable dans le modele RMBG : ${configuredName}. Noms detectes : ${names.join(", ") || "aucun"}.`,
+        `Nom ${kind} configuré introuvable dans le modèle RMBG : ${configuredName}. Noms détectés : ${names.join(", ") || "aucun"}.`,
       );
     }
 
@@ -30,7 +30,7 @@ export function selectModelTensorName(
   const [firstName] = names;
 
   if (!firstName) {
-    throw new Error(`Le modele RMBG ne declare aucun ${kind}.`);
+    throw new Error(`Le modèle RMBG ne déclare aucun ${kind}.`);
   }
 
   return firstName;
@@ -50,14 +50,14 @@ export function extractRmbgAlphaMask(
 
   if (!output) {
     throw new Error(
-      `Sortie modele RMBG vide : ${outputName}. Noms disponibles : ${Object.keys(outputs).join(", ") || "aucun"}.`,
+      `Sortie modèle RMBG vide : ${outputName}. Noms disponibles : ${Object.keys(outputs).join(", ") || "aucun"}.`,
     );
   }
 
   const values = getNumericTensorValues(output);
 
   if (values.length === 0) {
-    throw new Error("Sortie modele RMBG vide : aucun pixel de masque.");
+    throw new Error("Sortie modèle RMBG vide : aucun pixel de masque.");
   }
 
   const shape = getSingleChannelShape(output.dims, values.length, config);
@@ -94,7 +94,7 @@ function getNumericTensorValues(output: OnnxTensorLike): ArrayLike<number> {
     return data;
   }
 
-  throw new Error("Sortie modele RMBG incompatible : tenseur non numerique.");
+  throw new Error("Sortie modèle RMBG incompatible : tenseur non numérique.");
 }
 
 function getSingleChannelShape(

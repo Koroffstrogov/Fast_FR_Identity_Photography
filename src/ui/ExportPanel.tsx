@@ -4,6 +4,7 @@ import {
 } from "../core/file-naming";
 import { PRINT_LAYOUTS, PrintLayoutMode } from "../core/print-layout";
 import { SheetComposition } from "../core/sheet-items";
+import { ButtonIcon } from "./icons";
 
 type ExportPanelProps = {
   photoCount: number;
@@ -37,9 +38,9 @@ export function ExportPanel({
       <fieldset className="mode-control">
         <legend>Nommage exports</legend>
         <label className="select-control">
-          <span>Modele</span>
+          <span>Modèle</span>
           <select
-            aria-label="Modele de nommage"
+            aria-label="Modèle de nommage"
             value={fileNamingTemplate}
             onChange={(event) =>
               onFileNamingTemplateChange(event.currentTarget.value as FileNamingTemplateId)
@@ -76,40 +77,59 @@ export function ExportPanel({
       </fieldset>
 
       <p className="sheet-total">
-        Total demande : {composition.requestedCount} / {composition.capacity} places.
+        Total demandé : {composition.requestedCount} / {composition.capacity} places.
       </p>
 
       {composition.isLimited && (
         <p className="warning" role="alert">
-          Le total depasse la capacite. L'export sera limite aux{" "}
-          {composition.capacity} premieres photos.
+          Le total dépasse la capacité. L'export sera limité aux{" "}
+          {composition.capacity} premières photos.
         </p>
       )}
 
       <p className="print-note">
-        Impression a 100 %, sans ajustement a la page. Verifiez la regle 10 cm
+        Impression à 100 %, sans ajustement à la page. Vérifiez la règle 10 cm
         en bas de la planche.
       </p>
 
       <div className="button-row">
-        <button type="button" onClick={onSheetExport} disabled={!hasPhotos}>
+        <button
+          type="button"
+          className="button-with-icon"
+          onClick={onSheetExport}
+          disabled={!hasPhotos}
+        >
+          <ButtonIcon name="image" />
           Export planche A4
         </button>
-        <button type="button" onClick={onPrintSheet} disabled={!hasPhotos}>
+        <button
+          type="button"
+          className="button-with-icon"
+          onClick={onPrintSheet}
+          disabled={!hasPhotos}
+        >
+          <ButtonIcon name="print" />
           Imprimer A4
         </button>
       </div>
 
-      <button type="button" onClick={onZipExport} disabled={!hasPhotos}>
+      <button
+        type="button"
+        className="button-with-icon"
+        onClick={onZipExport}
+        disabled={!hasPhotos}
+      >
+        <ButtonIcon name="zip" />
         Exporter toutes les photos en ZIP
       </button>
       <button
         type="button"
-        className="secondary-button"
+        className="secondary-button button-with-icon"
         onClick={onSeparateExport}
         disabled={!hasPhotos}
       >
-        Telecharger separement
+        <ButtonIcon name="download" />
+        Télécharger séparément
       </button>
     </form>
   );

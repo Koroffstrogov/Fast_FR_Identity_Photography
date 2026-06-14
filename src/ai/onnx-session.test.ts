@@ -106,7 +106,7 @@ describe("ONNX session setup", () => {
         modelBytes: new Uint8Array(2048),
       }),
     ).rejects.toThrow(
-      "Le modele ONNX est charge, mais ONNX Runtime Web ne peut pas creer la session",
+      "Le modèle ONNX est chargé, mais ONNX Runtime Web ne peut pas créer la session",
     );
 
     await expect(
@@ -123,7 +123,7 @@ describe("ONNX session setup", () => {
 
     await expect(
       loadLocalOnnxModel("/models/rmbg1.4/model_fp16.onnx", async () => response),
-    ).rejects.toThrow("Modele RMBG-1.4 ONNX introuvable");
+    ).rejects.toThrow("Modèle RMBG-1.4 ONNX introuvable");
   });
 
   it("reports Vite HTML fallback before ONNX session creation", async () => {
@@ -142,7 +142,7 @@ describe("ONNX session setup", () => {
         runtime,
         fetchModel: async () => htmlResponse,
       }),
-    ).rejects.toThrow("Le chemin du modele renvoie l'application HTML");
+    ).rejects.toThrow("Le chemin du modèle renvoie l'application HTML");
 
     expect(runtime.InferenceSession.create).not.toHaveBeenCalled();
   });

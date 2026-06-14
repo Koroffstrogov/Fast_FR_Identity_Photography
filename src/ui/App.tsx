@@ -71,6 +71,12 @@ import { RightInspector } from "./RightInspector";
 import { TopBar } from "./TopBar";
 import { Workspace } from "./Workspace";
 import { AppMode } from "./app-mode";
+import {
+  EDITOR_INTERACTION_MODE_MESSAGES,
+  EditorInteractionMode,
+  getFacePointPlacementMessage,
+  getLegacyPointEditMode,
+} from "./editor-interaction-mode";
 import type { FaceLandmarkerModelStatus } from "../vision/face-landmarker";
 import {
   BackgroundRemovalStatus,
@@ -130,6 +136,13 @@ export function App() {
   const [backgroundRemovalError, setBackgroundRemovalError] = useState("");
   const [backgroundPointMode, setBackgroundPointMode] =
     useState<BackgroundPointMode>("none");
+  const [editorInteractionMode, setEditorInteractionMode] =
+    useState<EditorInteractionMode>("move-photo");
+  const [hoveredFacePointKind, setHoveredFacePointKind] =
+    useState<PhotoManualFacePointKind | null>(null);
+  const [draggedFacePointKind, setDraggedFacePointKind] =
+    useState<PhotoManualFacePointKind | null>(null);
+  const [isDraggingPhoto, setIsDraggingPhoto] = useState(false);
   const sheetCapacity = useMemo(() => getSheetCapacity(sheetMode), [sheetMode]);
   const activePhoto = useMemo(
     () => photos.find((photo) => photo.id === activePhotoId) ?? null,
@@ -179,13 +192,18 @@ export function App() {
       renderFaceGuideOverlay(guideCanvas, {
         showGuide: appMode === "crop" && activePhoto.editState.showFaceGuide,
         opacity: activePhoto.editState.faceGuideOpacity,
-        manualPoints: getGuideOverlayPoints(activePhoto, appMode),
+        manualPoints: getGuideOverlayPoints(
+          activePhoto,
+          appMode,
+          hoveredFacePointKind,
+          draggedFacePointKind,
+        ),
       });
       return;
     }
 
     prepareGuideCanvas(guideCanvas);
-  }, [activePhoto, appMode]);
+  }, [activePhoto, appMode, hoveredFacePointKind, draggedFacePointKind]);
 
   useEffect(() => {
     const canvas = photoCanvasRef.current;
@@ -237,6 +255,41 @@ export function App() {
       canvas.removeEventListener("wheel", handleWheel);
     };
   }, [activePhotoId, appMode]);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape" || appMode !== "crop") {
+        return;
+      }
+
+      if (editorInteractionMode === "move-photo") {
+        return;
+      }
+
+      event.preventDefault();
+      dragStateRef.current = null;
+      setIsDraggingPhoto(false);
+      setDraggedFacePointKind(null);
+      setHoveredFacePointKind(null);
+      setEditorInteractionMode("move-photo");
+      syncActiveFacePointEditMode("move-photo");
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [appMode, editorInteractionMode, activePhotoId]);
+
+  useEffect(() => {
+    dragStateRef.current = null;
+    setIsDraggingPhoto(false);
+    setDraggedFacePointKind(null);
+    setHoveredFacePointKind(null);
+
+    if (appMode !== "crop" && editorInteractionMode !== "move-photo") {
+      setEditorInteractionMode("move-photo");
+    }
+  }, [appMode, activePhotoId, editorInteractionMode]);
 
   useEffect(() => {
     if (!activePhoto) {
@@ -303,7 +356,7 @@ export function App() {
     setImportErrors(result.errors);
 
     if (result.errors.length === files.length) {
-      setError("Aucune image valide n'a pu etre importee.");
+      setError("Aucune image valide n'a pu être importée.");
       return;
     }
 
@@ -477,7 +530,7 @@ export function App() {
       setError(
         qualityError instanceof Error
           ? qualityError.message
-          : "Impossible de reinitialiser les corrections qualite.",
+          : "Impossible de réinitialiser les corrections qualité.",
       );
     }
   }
@@ -564,7 +617,7 @@ export function App() {
             ...(currentPhoto.faceDetection ?? getDefaultPhotoFaceDetectionState()),
             status: "not-found",
             diagnostics: analysis.diagnostics,
-            message: "Aucun visage exploitable n'a ete detecte.",
+            message: "Aucun visage exploitable n'a été détecté.",
           },
         }));
         return;
@@ -587,14 +640,16 @@ export function App() {
           manualPoints: facePoints,
           diagnostics,
           message:
-            "4 points visage places automatiquement. Verifiez les deux yeux, le menton et le sommet avant cadrage.",
+            "4 points visage placés automatiquement. Vérifiez les deux yeux, le menton et le sommet avant cadrage.",
         },
       }));
+      setEditorInteractionMode("move-face-points");
+      setHoveredFacePointKind(null);
     } catch (detectError) {
       const message =
         detectError instanceof Error
           ? detectError.message
-          : "Impossible de detecter le visage sur la photo active.";
+          : "Impossible de détecter le visage sur la photo active.";
 
       updatePhoto(photo.id, (currentPhoto) => ({
         ...currentPhoto,
@@ -608,46 +663,63 @@ export function App() {
     }
   }
 
-  function handleFaceManualPlacementChange(enabled: boolean) {
-    updateActivePhoto((photo) => {
-      const faceDetection = photo.faceDetection ?? getDefaultPhotoFaceDetectionState();
-
-      return {
-        ...photo,
-        faceDetection: {
-          ...faceDetection,
-          status: enabled ? "manual" : faceDetection.status,
-          manualAssistantEnabled: enabled,
-          pointEditMode: enabled ? "place" : "none",
-          showFacePoints: enabled ? true : faceDetection.showFacePoints,
-          message: enabled
-            ? "Cliquez oeil gauche, oeil droit, menton, puis sommet du crane."
-            : faceDetection.message,
-        },
-      };
-    });
+  function handleEditorInteractionModeChange(
+    mode: EditorInteractionMode,
+    options?: { resetFacePoints?: boolean },
+  ) {
+    dragStateRef.current = null;
+    setIsDraggingPhoto(false);
+    setDraggedFacePointKind(null);
+    setHoveredFacePointKind(null);
+    setEditorInteractionMode(mode);
+    syncActiveFacePointEditMode(mode, options);
   }
 
-  function handleFacePointMoveChange(enabled: boolean) {
+  function syncActiveFacePointEditMode(
+    mode: EditorInteractionMode,
+    options?: { resetFacePoints?: boolean },
+  ) {
     updateActivePhoto((photo) => {
       const faceDetection = photo.faceDetection ?? getDefaultPhotoFaceDetectionState();
+      const nextPointEditMode = getLegacyPointEditMode(mode);
+      const shouldResetFacePoints =
+        mode === "place-face-points" && options?.resetFacePoints === true;
+      const manualPoints = shouldResetFacePoints ? [] : faceDetection.manualPoints;
+      const showFacePoints =
+        mode === "place-face-points" || mode === "move-face-points"
+          ? true
+          : faceDetection.showFacePoints;
+      const message =
+        mode === "place-face-points"
+          ? getFacePointPlacementMessage(manualPoints)
+          : mode === "move-face-points"
+            ? EDITOR_INTERACTION_MODE_MESSAGES["move-face-points"]
+            : faceDetection.message;
 
       return {
         ...photo,
         faceDetection: {
           ...faceDetection,
-          manualAssistantEnabled: false,
-          pointEditMode: enabled ? "move" : "none",
-          showFacePoints: enabled ? true : faceDetection.showFacePoints,
-          message: enabled
-            ? "Cliquez puis glissez un point visage pour le deplacer."
-            : faceDetection.message,
+          status: mode === "place-face-points" ? "manual" : faceDetection.status,
+          manualAssistantEnabled: mode === "place-face-points",
+          pointEditMode: nextPointEditMode,
+          showFacePoints,
+          manualPoints,
+          message,
         },
       };
     });
   }
 
   function handleFacePointsVisibilityChange(showFacePoints: boolean) {
+    if (!showFacePoints && editorInteractionMode !== "move-photo") {
+      setEditorInteractionMode("move-photo");
+      setHoveredFacePointKind(null);
+      setDraggedFacePointKind(null);
+      dragStateRef.current = null;
+      setIsDraggingPhoto(false);
+    }
+
     updateActivePhoto((photo) => {
       const faceDetection = photo.faceDetection ?? getDefaultPhotoFaceDetectionState();
 
@@ -659,7 +731,9 @@ export function App() {
           manualAssistantEnabled: showFacePoints
             ? faceDetection.manualAssistantEnabled
             : false,
-          pointEditMode: showFacePoints ? faceDetection.pointEditMode : "none",
+          pointEditMode: showFacePoints
+            ? faceDetection.pointEditMode
+            : getLegacyPointEditMode("move-photo"),
         },
       };
     });
@@ -711,6 +785,11 @@ export function App() {
   }
 
   function handleDeleteFacePoints() {
+    dragStateRef.current = null;
+    setEditorInteractionMode("move-photo");
+    setHoveredFacePointKind(null);
+    setDraggedFacePointKind(null);
+    setIsDraggingPhoto(false);
     updateActivePhoto((photo) => ({
       ...photo,
       faceDetection: {
@@ -720,7 +799,7 @@ export function App() {
         pointEditMode: "none",
         manualPoints: [],
         diagnostics: [],
-        message: "Points visage supprimes.",
+        message: "Points visage supprimés.",
       },
     }));
   }
@@ -729,7 +808,7 @@ export function App() {
     const photo = activePhoto;
 
     if (!photo) {
-      return "Importez une photo avant de charger le modele de fond.";
+      return "Importez une photo avant de charger le modèle de fond.";
     }
 
     const backgroundEdit = photo.backgroundEdit ?? getDefaultBackgroundEditState();
@@ -754,7 +833,7 @@ export function App() {
           technicalDiagnostics: diagnostics,
           message:
             diagnostics.fallbackMessage ??
-            `Modele ${getRmbgEngineLabel(diagnostics.engine)} charge localement. Aucune photo n'a ete envoyee.`,
+            `Modèle ${getRmbgEngineLabel(diagnostics.engine)} chargé localement. Aucune photo n'a été envoyée.`,
         },
       }));
       return null;
@@ -820,7 +899,7 @@ export function App() {
       const message =
         diagnosticError instanceof Error
           ? diagnosticError.message
-          : "Impossible de diagnostiquer la creation de session ONNX.";
+          : "Impossible de diagnostiquer la création de session ONNX.";
 
       updatePhoto(photo.id, (currentPhoto) => ({
         ...currentPhoto,
@@ -954,7 +1033,7 @@ export function App() {
                 technicalDiagnostics: undefined,
                 sessionDiagnostics: [],
                 maskVersion: backgroundEdit.maskVersion + 1,
-                message: "Moteur ou modele RMBG change. Rechargez le modele avant inference.",
+                message: "Moteur ou modèle RMBG changé. Rechargez le modèle avant inférence.",
               }
             : {}),
           ...normalizedPartialEdit,
@@ -974,7 +1053,7 @@ export function App() {
           manualForegroundPoints: [],
           manualBackgroundPoints: [],
           maskVersion: backgroundEdit.maskVersion + 1,
-          message: "Points de correction effaces.",
+          message: "Points de correction effacés.",
         },
       };
     });
@@ -997,7 +1076,7 @@ export function App() {
           manualForegroundPoints: [],
           manualBackgroundPoints: [],
           maskVersion: backgroundEdit.maskVersion + 1,
-          message: "Reglages fond reinitialises sans relancer l'inference.",
+          message: "Réglages fond réinitialisés sans relancer l'inférence.",
         },
       };
     });
@@ -1010,8 +1089,9 @@ export function App() {
 
     const faceDetection = activePhoto.faceDetection ?? getDefaultPhotoFaceDetectionState();
 
-    if (appMode === "crop" && faceDetection.pointEditMode === "place") {
+    if (appMode === "crop" && editorInteractionMode === "place-face-points") {
       event.preventDefault();
+      setHoveredFacePointKind(null);
       const rect = event.currentTarget.getBoundingClientRect();
       const canvasPoint = getCanvasPointFromClientPoint(
         {
@@ -1049,16 +1129,16 @@ export function App() {
             status: "manual",
             manualAssistantEnabled: true,
             showFacePoints: true,
-            pointEditMode: "place",
+            pointEditMode: getLegacyPointEditMode("place-face-points"),
             manualPoints,
-            message: `${Math.min(manualPoints.length, 4)}/4 point(s) visage place(s).`,
+            message: getFacePointPlacementMessage(manualPoints),
           },
         };
       });
       return;
     }
 
-    if (appMode === "crop" && faceDetection.pointEditMode === "move") {
+    if (appMode === "crop" && editorInteractionMode === "move-face-points") {
       event.preventDefault();
       const rect = event.currentTarget.getBoundingClientRect();
       const canvasPoint = getCanvasPointFromClientPoint(
@@ -1087,13 +1167,15 @@ export function App() {
           ...photo,
           faceDetection: {
             ...(photo.faceDetection ?? getDefaultPhotoFaceDetectionState()),
-            message: "Cliquez directement sur un point visage pour le deplacer.",
+            message: "Cliquez directement sur un point visage pour le déplacer.",
           },
         }));
         return;
       }
 
       event.currentTarget.setPointerCapture(event.pointerId);
+      setDraggedFacePointKind(pointKind);
+      setHoveredFacePointKind(pointKind);
       dragStateRef.current = {
         kind: "face-point",
         pointerId: event.pointerId,
@@ -1139,8 +1221,8 @@ export function App() {
             ...nextBackgroundEdit,
             message:
               backgroundPointMode === "foreground"
-                ? "Point personne ajoute."
-                : "Point fond ajoute.",
+                ? "Point personne ajouté."
+                : "Point fond ajouté.",
           },
         };
       });
@@ -1148,6 +1230,7 @@ export function App() {
     }
 
     event.currentTarget.setPointerCapture(event.pointerId);
+    setIsDraggingPhoto(true);
     dragStateRef.current = {
       kind: "photo",
       pointerId: event.pointerId,
@@ -1158,6 +1241,48 @@ export function App() {
 
   function handlePointerMove(event: PointerEvent<HTMLCanvasElement>) {
     const dragState = dragStateRef.current;
+
+    if (
+      activePhoto &&
+      appMode === "crop" &&
+      editorInteractionMode === "move-face-points" &&
+      !dragState
+    ) {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const canvasPoint = getCanvasPointFromClientPoint(
+        {
+          x: event.clientX,
+          y: event.clientY,
+        },
+        {
+          x: rect.left,
+          y: rect.top,
+          width: rect.width,
+          height: rect.height,
+        },
+        PHOTO_CANVAS_SIZE,
+      );
+      const faceDetection =
+        activePhoto.faceDetection ?? getDefaultPhotoFaceDetectionState();
+      const pointKind = findNearestFacePointKind(
+        faceDetection.manualPoints,
+        canvasPoint,
+        getPhotoImageSize(activePhoto),
+        PHOTO_CANVAS_SIZE,
+        activePhoto.editState.transform,
+      );
+
+      setHoveredFacePointKind(pointKind);
+      return;
+    }
+
+    if (
+      editorInteractionMode !== "move-face-points" &&
+      hoveredFacePointKind &&
+      !dragState
+    ) {
+      setHoveredFacePointKind(null);
+    }
 
     if (!activePhotoId || !dragState || dragState.pointerId !== event.pointerId) {
       return;
@@ -1197,13 +1322,13 @@ export function App() {
           faceDetection: {
             ...faceDetection,
             showFacePoints: true,
-            pointEditMode: "move",
+            pointEditMode: getLegacyPointEditMode("move-face-points"),
             manualPoints: upsertManualFacePoint(faceDetection.manualPoints, {
               kind: dragState.pointKind,
               xPx: sourcePoint.x,
               yPx: sourcePoint.y,
             }),
-            message: `Point ${getManualFacePointLabel(dragState.pointKind)} deplace.`,
+            message: `Point ${getManualFacePointLabel(dragState.pointKind)} déplacé.`,
           },
         };
       });
@@ -1245,7 +1370,21 @@ export function App() {
 
   function handlePointerEnd(event: PointerEvent<HTMLCanvasElement>) {
     if (dragStateRef.current?.pointerId === event.pointerId) {
+      if (dragStateRef.current.kind === "photo") {
+        setIsDraggingPhoto(false);
+      }
+
+      if (dragStateRef.current.kind === "face-point") {
+        setDraggedFacePointKind(null);
+      }
+
       dragStateRef.current = null;
+    }
+  }
+
+  function handlePointerLeave() {
+    if (!dragStateRef.current) {
+      setHoveredFacePointKind(null);
     }
   }
 
@@ -1407,7 +1546,6 @@ export function App() {
         photoCount={photos.length}
         sheetCapacity={sheetCapacity}
         onModeChange={setAppMode}
-        onFileChange={handleFileChange}
       />
 
       <div className="app-main-grid">
@@ -1417,7 +1555,6 @@ export function App() {
           sheetCapacity={sheetCapacity}
           fileNamingTemplate={fileNamingTemplate}
           error={error}
-          importSummary={importSummary}
           importErrors={importErrors}
           onFileChange={handleFileChange}
           onSelectPhoto={setActivePhotoId}
@@ -1438,9 +1575,13 @@ export function App() {
           sheetCanvasRef={sheetCanvasRef}
           sheetMode={sheetMode}
           composition={sheetComposition}
+          interactionMode={editorInteractionMode}
+          isDraggingPhoto={isDraggingPhoto}
+          hasHoveredFacePoint={Boolean(hoveredFacePointKind)}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerEnd={handlePointerEnd}
+          onPointerLeave={handlePointerLeave}
         />
 
         <RightInspector
@@ -1452,6 +1593,7 @@ export function App() {
           composition={sheetComposition}
           faceModelStatus={faceModelStatus}
           faceModelError={faceModelError}
+          editorInteractionMode={editorInteractionMode}
           backgroundRemovalStatus={backgroundRemovalStatus}
           backgroundRemovalError={backgroundRemovalError}
           backgroundPointMode={backgroundPointMode}
@@ -1459,8 +1601,7 @@ export function App() {
           onGuideOpacityChange={handleGuideOpacityChange}
           onLoadFaceModel={handleLoadFaceModel}
           onPlaceFacePointsAutomatically={handlePlaceFacePointsAutomatically}
-          onManualPlacementChange={handleFaceManualPlacementChange}
-          onMoveFacePointChange={handleFacePointMoveChange}
+          onEditorInteractionModeChange={handleEditorInteractionModeChange}
           onFacePointsVisibilityChange={handleFacePointsVisibilityChange}
           onApplyFacePlacementFromPoints={handleApplyFacePlacementFromPoints}
           onDeleteFacePoints={handleDeleteFacePoints}
@@ -1489,6 +1630,7 @@ export function App() {
         mode={appMode}
         photo={activePhoto}
         composition={sheetComposition}
+        editorInteractionMode={editorInteractionMode}
         onTransformChange={handleTransformChange}
         onResetPhoto={handleResetActivePhoto}
       />
@@ -1503,14 +1645,29 @@ function getPhotoImageSize(photo: PhotoItem): Size {
   };
 }
 
-function getGuideOverlayPoints(photo: PhotoItem, appMode: AppMode): GuideOverlayPoint[] {
+function getGuideOverlayPoints(
+  photo: PhotoItem,
+  appMode: AppMode,
+  hoveredFacePointKind: PhotoManualFacePointKind | null,
+  draggedFacePointKind: PhotoManualFacePointKind | null,
+): GuideOverlayPoint[] {
   return [
-    ...(appMode === "crop" ? getManualFaceGuideOverlayPoints(photo) : []),
+    ...(appMode === "crop"
+      ? getManualFaceGuideOverlayPoints(
+          photo,
+          hoveredFacePointKind,
+          draggedFacePointKind,
+        )
+      : []),
     ...(appMode === "background" ? getBackgroundGuideOverlayPoints(photo) : []),
   ];
 }
 
-function getManualFaceGuideOverlayPoints(photo: PhotoItem): GuideOverlayPoint[] {
+function getManualFaceGuideOverlayPoints(
+  photo: PhotoItem,
+  hoveredFacePointKind: PhotoManualFacePointKind | null,
+  draggedFacePointKind: PhotoManualFacePointKind | null,
+): GuideOverlayPoint[] {
   const faceDetection = photo.faceDetection;
 
   if (
@@ -1536,6 +1693,12 @@ function getManualFaceGuideOverlayPoints(photo: PhotoItem): GuideOverlayPoint[] 
       xPx: canvasPoint.x,
       yPx: canvasPoint.y,
       label: getManualFacePointLabel(point.kind),
+      state:
+        point.kind === draggedFacePointKind
+          ? "selected"
+          : point.kind === hoveredFacePointKind
+            ? "hovered"
+            : "normal",
     };
   });
 }
@@ -1630,10 +1793,10 @@ function getOnnxSessionDiagnosticSummary(
   const firstError = results.find((result) => result.error)?.error;
 
   return [
-    "Le modele est charge, mais aucune variante ONNX Runtime Web ne cree la session.",
-    "Le modele est valide ONNX cote Python, mais incompatible avec ONNX Runtime Web dans cette forme.",
+    "Le modèle est chargé, mais aucune variante ONNX Runtime Web ne crée la session.",
+    "Le modèle est valide ONNX côté Python, mais incompatible avec ONNX Runtime Web dans cette forme.",
     firstError ? `Erreur representative : ${firstError}` : "",
-    "Pistes suivantes : tester un autre modele RMBG-1.4, tester model_quantized.onnx, convertir en format .ort, tester une autre version de onnxruntime-web ou un autre export ONNX compatible navigateur.",
+    "Pistes suivantes : tester un autre modèle RMBG-1.4, tester model_quantized.onnx, convertir en format .ort, tester une autre version de onnxruntime-web ou un autre export ONNX compatible navigateur.",
   ]
     .filter(Boolean)
     .join(" ");

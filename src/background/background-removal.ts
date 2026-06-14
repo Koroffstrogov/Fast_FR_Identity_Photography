@@ -61,12 +61,12 @@ export function getBackgroundRemovalErrorMessage(error: unknown): string {
   const detail = error instanceof Error ? error.message : String(error);
 
   if (
-    detail.startsWith("Modele RMBG") ||
-    detail.startsWith("Le modele ONNX est charge") ||
+    detail.startsWith("Modèle RMBG") ||
+    detail.startsWith("Le modèle ONNX est chargé") ||
     detail.startsWith(".wasm ONNX") ||
     detail.startsWith("WebGPU") ||
-    detail.startsWith("Le chemin du modele renvoie l'application HTML") ||
-    detail.startsWith("Sortie modele RMBG") ||
+    detail.startsWith("Le chemin du modèle renvoie l'application HTML") ||
+    detail.startsWith("Sortie modèle RMBG") ||
     detail.startsWith("Shape de sortie RMBG")
   ) {
     return detail;

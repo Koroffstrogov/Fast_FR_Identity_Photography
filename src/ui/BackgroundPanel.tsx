@@ -16,6 +16,7 @@ import {
   getRmbgModelOptions,
   normalizeRmbgModelPath,
 } from "../background/rmbg-config";
+import { ButtonIcon } from "./icons";
 
 export type BackgroundPointMode = "none" | "foreground" | "background";
 
@@ -37,7 +38,7 @@ type BackgroundPanelProps = {
 const RECOMMENDED_BACKGROUND_COLORS = [
   { label: "Gris clair", value: "#eeeeee" },
   { label: "Bleu clair", value: "#dbeafe" },
-  { label: "Gris bleute", value: "#e5edf0" },
+  { label: "Gris bleuté", value: "#e5edf0" },
 ] as const;
 
 export function BackgroundPanel({
@@ -79,31 +80,35 @@ export function BackgroundPanel({
         <p className="model-status">
           {getRmbgEngineLabel("rmbg1.4")} : suppression locale, sans envoi de photo.
         </p>
-        <p className="model-status">Etat modele : {getRemovalStatusLabel(removalStatus)}</p>
+        <p className="model-status">État modèle : {getRemovalStatusLabel(removalStatus)}</p>
 
         <div className="button-row">
           <button
             type="button"
-            className="secondary-button"
+            className="secondary-button button-with-icon"
             onClick={onLoadModel}
             disabled={disabled || isBusy}
           >
-            Charger / verifier le modele
+            <ButtonIcon name="download" />
+            Charger / vérifier le modèle
           </button>
           <button
             type="button"
+            className="button-with-icon"
             onClick={onRemoveBackground}
             disabled={disabled || isBusy}
           >
+            <ButtonIcon name="background" />
             Supprimer le fond
           </button>
           <button
             type="button"
-            className="secondary-button"
+            className="secondary-button button-with-icon"
             onClick={onRemoveBackground}
             disabled={disabled || isBusy}
           >
-            Reappliquer
+            <ButtonIcon name="refresh" />
+            Réappliquer
           </button>
         </div>
 
@@ -126,10 +131,10 @@ export function BackgroundPanel({
         </label>
 
         <fieldset className="mode-control">
-          <legend>Apercu fond</legend>
+          <legend>Aperçu fond</legend>
           <div className="segmented-options background-mode-options">
             {renderModeOption("original", "Original", edit.mode, disabled, onBackgroundChange)}
-            {renderModeOption("replace", "Fond remplace", edit.mode, disabled, onBackgroundChange)}
+            {renderModeOption("replace", "Fond remplacé", edit.mode, disabled, onBackgroundChange)}
             {renderModeOption("mask-preview", "Masque", edit.mode, disabled, onBackgroundChange)}
           </div>
         </fieldset>
@@ -151,7 +156,7 @@ export function BackgroundPanel({
               disabled={disabled}
             />
           </label>
-          <div className="background-swatches" aria-label="Couleurs recommandees">
+          <div className="background-swatches" aria-label="Couleurs recommandées">
             {RECOMMENDED_BACKGROUND_COLORS.map((color) => (
               <button
                 key={color.value}
@@ -175,12 +180,12 @@ export function BackgroundPanel({
       </div>
 
       <details className="background-advanced">
-        <summary>Options avancees</summary>
+        <summary>Options avancées</summary>
 
         <label className="select-control">
-          <span>Modele</span>
+          <span>Modèle</span>
           <select
-            aria-label="Modele RMBG"
+            aria-label="Modèle RMBG"
             value={selectedModelPath}
             onChange={(event) => {
               const modelPath = event.currentTarget.value;
@@ -200,7 +205,7 @@ export function BackgroundPanel({
           </select>
         </label>
         <p className="manual-note">
-          {selectedModelOption?.description ?? "Modele RMBG-1.4 local configurable."}
+          {selectedModelOption?.description ?? "Modèle RMBG-1.4 local configurable."}
         </p>
 
         <label className="select-control">
@@ -230,7 +235,7 @@ export function BackgroundPanel({
             onClick={onDiagnoseSession}
             disabled={disabled || isBusy}
           >
-            Diagnostiquer session ONNX
+            Diagnostiquer la session ONNX
           </button>
         )}
 
@@ -312,19 +317,21 @@ export function BackgroundPanel({
         <div className="button-row">
           <button
             type="button"
-            className="secondary-button"
+            className="secondary-button button-with-icon"
             onClick={onResetSettings}
             disabled={disabled}
           >
-            Reinitialiser les reglages fond
+            <ButtonIcon name="reset" />
+            Réinitialiser les réglages fond
           </button>
           <button
             type="button"
-            className="secondary-button"
+            className="secondary-button button-with-icon"
             onClick={() => onBackgroundChange({ enabled: false, mode: "original" })}
             disabled={disabled}
           >
-            Desactiver le remplacement du fond
+            <ButtonIcon name="eyeOff" />
+            Désactiver le remplacement du fond
           </button>
         </div>
 
@@ -338,7 +345,7 @@ export function BackgroundPanel({
             <dd>{navigatorGpuAvailable ? "oui" : "non"}</dd>
           </div>
           <div>
-            <dt>Backend demande</dt>
+            <dt>Backend demandé</dt>
             <dd>{getBackendPreferenceLabel(edit.backendPreference)}</dd>
           </div>
           <div>
@@ -350,11 +357,11 @@ export function BackgroundPanel({
             <dd>{diagnostics?.provider ?? "-"}</dd>
           </div>
           <div>
-            <dt>Modele charge</dt>
+            <dt>Modèle chargé</dt>
             <dd>{getLoadedModelLabel(diagnostics?.modelPath, selectedModelName)}</dd>
           </div>
           <div>
-            <dt>Taille modele</dt>
+            <dt>Taille modèle</dt>
             <dd>{formatBytes(diagnostics?.modelBytes)}</dd>
           </div>
           <div>
@@ -362,11 +369,11 @@ export function BackgroundPanel({
             <dd>{formatMs(diagnostics?.sessionCreationMs)}</dd>
           </div>
           <div>
-            <dt>Inference</dt>
+            <dt>Inférence</dt>
             <dd>{formatMs(diagnostics?.inferenceMs)}</dd>
           </div>
           <div>
-            <dt>Entree modele</dt>
+            <dt>Entrée modèle</dt>
             <dd>{diagnostics ? `${diagnostics.inputWidth}x${diagnostics.inputHeight}` : "1024x1024"}</dd>
           </div>
           <div>
@@ -376,20 +383,20 @@ export function BackgroundPanel({
         </dl>
 
         <details className="technical-details">
-          <summary>Details ONNX</summary>
-          <p>Input detecte : {diagnostics?.selectedInputName ?? "-"}</p>
-          <p>Output detecte : {diagnostics?.selectedOutputName ?? "-"}</p>
+          <summary>Détails ONNX</summary>
+          <p>Input détecté : {diagnostics?.selectedInputName ?? "-"}</p>
+          <p>Output détecté : {diagnostics?.selectedOutputName ?? "-"}</p>
           <p>Input names : {formatNames(diagnostics?.inputNames)}</p>
           <p>Output names : {formatNames(diagnostics?.outputNames)}</p>
           <p>Assets WASM : {diagnostics?.ortWasmPath ?? "/ort/"}</p>
           <p>Origin courant : {diagnostics?.currentOrigin ?? browserOrigin ?? "-"}</p>
-          <p>Modele : {diagnostics?.modelPath ?? selectedModelPath}</p>
-          <p>Nom modele : {getRmbgModelFileName(diagnostics?.modelPath ?? selectedModelPath)}</p>
+          <p>Modèle : {diagnostics?.modelPath ?? selectedModelPath}</p>
+          <p>Nom modèle : {getRmbgModelFileName(diagnostics?.modelPath ?? selectedModelPath)}</p>
           <p>Fichier local dev : {getRmbgLocalModelPath(selectedModelPath)}</p>
-          <p>URL testee : {diagnostics?.modelUrl ?? fallbackModelUrl}</p>
-          <p>HTTP modele : {diagnostics?.modelHttpStatus ?? "-"}</p>
-          <p>Content-Type modele : {diagnostics?.modelContentType ?? "-"}</p>
-          <p>Octets modele : {diagnostics?.modelBytes ?? "-"}</p>
+          <p>URL testée : {diagnostics?.modelUrl ?? fallbackModelUrl}</p>
+          <p>HTTP modèle : {diagnostics?.modelHttpStatus ?? "-"}</p>
+          <p>Content-Type modèle : {diagnostics?.modelContentType ?? "-"}</p>
+          <p>Octets modèle : {diagnostics?.modelBytes ?? "-"}</p>
           {diagnostics?.fallbackMessage && (
             <p className="warning">{diagnostics.fallbackMessage}</p>
           )}
@@ -397,7 +404,7 @@ export function BackgroundPanel({
 
         {edit.sessionDiagnostics.length > 0 && (
           <details className="technical-details" open>
-            <summary>Diagnostic creation session</summary>
+            <summary>Diagnostic création session</summary>
             <div className="diagnostic-table-wrap">
               <table className="diagnostic-table">
                 <thead>
@@ -407,7 +414,7 @@ export function BackgroundPanel({
                     <th>Provider</th>
                     <th>Graphe</th>
                     <th>Source</th>
-                    <th>Resultat</th>
+                    <th>Résultat</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -419,7 +426,7 @@ export function BackgroundPanel({
                       <td>{formatGraphOptimization(result)}</td>
                       <td>{result.source}</td>
                       <td>
-                        {result.sessionCreated ? "OK" : "Echec"}
+                        {result.sessionCreated ? "OK" : "Échec"}
                         <small>{formatSessionDiagnosticDetail(result)}</small>
                       </td>
                     </tr>
@@ -433,26 +440,29 @@ export function BackgroundPanel({
         <div className="background-point-controls">
           <button
             type="button"
-            className={pointMode === "foreground" ? "active-tool-button" : "secondary-button"}
+            className={`${pointMode === "foreground" ? "active-tool-button" : "secondary-button"} button-with-icon`}
             onClick={() => onPointModeChange(pointMode === "foreground" ? "none" : "foreground")}
             disabled={disabled}
           >
-            Ajouter point personne a garder
+            <ButtonIcon name="point" />
+            Ajouter point personne à garder
           </button>
           <button
             type="button"
-            className={pointMode === "background" ? "active-tool-button" : "secondary-button"}
+            className={`${pointMode === "background" ? "active-tool-button" : "secondary-button"} button-with-icon`}
             onClick={() => onPointModeChange(pointMode === "background" ? "none" : "background")}
             disabled={disabled}
           >
-            Ajouter point fond a supprimer
+            <ButtonIcon name="point" />
+            Ajouter point fond à supprimer
           </button>
           <button
             type="button"
-            className="secondary-button"
+            className="secondary-button button-with-icon"
             onClick={onResetPoints}
             disabled={disabled || pointCount === 0}
           >
+            <ButtonIcon name="trash" />
             Effacer les points
           </button>
         </div>
@@ -499,11 +509,11 @@ function getFallbackBackgroundEditState(): BackgroundEditState {
 function getRemovalStatusLabel(status: BackgroundRemovalStatus): string {
   switch (status) {
     case "idle":
-      return "non charge";
+      return "non chargé";
     case "loading":
       return "chargement";
     case "ready":
-      return "pret";
+      return "prêt";
     case "error":
       return "erreur";
   }

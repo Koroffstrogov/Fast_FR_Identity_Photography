@@ -50,7 +50,7 @@ export function createFacePlacementFromCandidate(
     },
     imageSize,
     face.diagnostics,
-    "Cadrage propose automatiquement. Verifiez le menton, le sommet du crane et les yeux.",
+    "Cadrage proposé automatiquement. Vérifiez le menton, le sommet du crâne et les yeux.",
   );
 }
 
@@ -68,7 +68,7 @@ export function createFacePlacementFromManualPoints(
 export function createFacePlacementFromFacePoints(
   manualPoints: readonly PhotoManualFacePoint[],
   imageSize: Size,
-  message = "Cadrage applique a partir des points visage. Verifiez le guide avant export.",
+  message = "Cadrage appliqué à partir des points visage. Vérifiez le guide avant export.",
 ): FacePlacementResult {
   const leftEye = getManualPoint(manualPoints, "leftEye");
   const rightEye = getManualPoint(manualPoints, "rightEye");

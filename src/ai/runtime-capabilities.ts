@@ -50,7 +50,7 @@ export function resolveBackgroundBackend(
         requestedBackend,
         attempts: [],
         error:
-          "WebGPU indisponible dans ce navigateur. Selectionnez CPU pour utiliser ONNX Runtime WASM.",
+          "WebGPU indisponible dans ce navigateur. Sélectionnez CPU pour utiliser ONNX Runtime WASM.",
       };
     }
 

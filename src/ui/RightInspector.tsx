@@ -9,8 +9,10 @@ import { BackgroundPanel, BackgroundPointMode } from "./BackgroundPanel";
 import { ExportPanel } from "./ExportPanel";
 import { FaceDetectionPanel } from "./FaceDetectionPanel";
 import { FaceGuideControl } from "./FaceGuideControl";
+import { ButtonIcon } from "./icons";
 import { QualityPanel } from "./QualityPanel";
 import { AppMode, getAppModeLabel } from "./app-mode";
+import { EditorInteractionMode } from "./editor-interaction-mode";
 
 type RightInspectorProps = {
   mode: AppMode;
@@ -21,6 +23,7 @@ type RightInspectorProps = {
   composition: SheetComposition;
   faceModelStatus: FaceLandmarkerModelStatus;
   faceModelError: string;
+  editorInteractionMode: EditorInteractionMode;
   backgroundRemovalStatus: BackgroundRemovalStatus;
   backgroundRemovalError: string;
   backgroundPointMode: BackgroundPointMode;
@@ -28,8 +31,10 @@ type RightInspectorProps = {
   onGuideOpacityChange: (opacity: number) => void;
   onLoadFaceModel: () => void;
   onPlaceFacePointsAutomatically: () => void;
-  onManualPlacementChange: (enabled: boolean) => void;
-  onMoveFacePointChange: (enabled: boolean) => void;
+  onEditorInteractionModeChange: (
+    mode: EditorInteractionMode,
+    options?: { resetFacePoints?: boolean },
+  ) => void;
   onFacePointsVisibilityChange: (showFacePoints: boolean) => void;
   onApplyFacePlacementFromPoints: () => void;
   onDeleteFacePoints: () => void;
@@ -62,6 +67,7 @@ export function RightInspector({
   composition,
   faceModelStatus,
   faceModelError,
+  editorInteractionMode,
   backgroundRemovalStatus,
   backgroundRemovalError,
   backgroundPointMode,
@@ -69,8 +75,7 @@ export function RightInspector({
   onGuideOpacityChange,
   onLoadFaceModel,
   onPlaceFacePointsAutomatically,
-  onManualPlacementChange,
-  onMoveFacePointChange,
+  onEditorInteractionModeChange,
   onFacePointsVisibilityChange,
   onApplyFacePlacementFromPoints,
   onDeleteFacePoints,
@@ -111,10 +116,10 @@ export function RightInspector({
             photo={photo}
             modelStatus={faceModelStatus}
             modelError={faceModelError}
+            interactionMode={editorInteractionMode}
             onLoadModel={onLoadFaceModel}
             onPlaceFacePointsAutomatically={onPlaceFacePointsAutomatically}
-            onManualPlacementChange={onManualPlacementChange}
-            onMoveFacePointChange={onMoveFacePointChange}
+            onInteractionModeChange={onEditorInteractionModeChange}
             onFacePointsVisibilityChange={onFacePointsVisibilityChange}
             onApplyFacePlacementFromPoints={onApplyFacePlacementFromPoints}
             onDeleteFacePoints={onDeleteFacePoints}
@@ -162,7 +167,13 @@ export function RightInspector({
 
       {mode === "export" && (
         <div className="inspector-stack">
-          <button type="button" onClick={onExportPhoto} disabled={!photo}>
+          <button
+            type="button"
+            className="button-with-icon"
+            onClick={onExportPhoto}
+            disabled={!photo}
+          >
+            <ButtonIcon name="download" />
             Export JPEG
           </button>
           <ExportPanel
@@ -241,22 +252,34 @@ function SheetInspector({
         </div>
       </fieldset>
       <p className="sheet-total">
-        Total demande : {composition.requestedCount} / {composition.capacity} places.
+        Total demandé : {composition.requestedCount} / {composition.capacity} places.
       </p>
       {composition.isLimited && (
         <p className="warning" role="alert">
-          Le total depasse la capacite. L'export sera limite aux {composition.capacity} premieres
+          Le total dépasse la capacité. L'export sera limité aux {composition.capacity} premières
           photos.
         </p>
       )}
       <p className="print-note">
-        Impression a 100 %, sans ajustement a la page. Verifiez la regle 10 cm en bas.
+        Impression à 100 %, sans ajustement à la page. Vérifiez la règle 10 cm en bas.
       </p>
       <div className="button-row">
-        <button type="button" onClick={onSheetExport} disabled={!hasPhotos}>
+        <button
+          type="button"
+          className="button-with-icon"
+          onClick={onSheetExport}
+          disabled={!hasPhotos}
+        >
+          <ButtonIcon name="image" />
           Export planche A4
         </button>
-        <button type="button" onClick={onPrintSheet} disabled={!hasPhotos}>
+        <button
+          type="button"
+          className="button-with-icon"
+          onClick={onPrintSheet}
+          disabled={!hasPhotos}
+        >
+          <ButtonIcon name="print" />
           Imprimer A4
         </button>
       </div>

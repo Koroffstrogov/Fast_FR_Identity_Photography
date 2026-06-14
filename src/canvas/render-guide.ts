@@ -6,6 +6,7 @@ export type GuideOverlayPoint = {
   yPx: number;
   label: string;
   color?: string;
+  state?: "normal" | "hovered" | "selected" | "missing";
 };
 
 export type FaceGuideOverlayOptions = {
@@ -123,13 +124,24 @@ function drawManualPoints(
   context.textBaseline = "middle";
 
   manualPoints.forEach((point) => {
+    const radius = point.state === "selected" ? 10 : point.state === "hovered" ? 9 : 7;
+    const lineWidth = point.state === "selected" ? 4 : point.state === "hovered" ? 3 : 2;
+
     context.beginPath();
-    context.arc(point.xPx, point.yPx, 7, 0, Math.PI * 2);
+    context.arc(point.xPx, point.yPx, radius, 0, Math.PI * 2);
     context.fillStyle = point.color ?? "rgb(22 78 99 / 90%)";
     context.fill();
-    context.lineWidth = 2;
+    context.lineWidth = lineWidth;
     context.strokeStyle = "#ffffff";
     context.stroke();
+
+    if (point.state === "selected" || point.state === "hovered") {
+      context.beginPath();
+      context.arc(point.xPx, point.yPx, radius + 4, 0, Math.PI * 2);
+      context.lineWidth = 2;
+      context.strokeStyle = point.state === "selected" ? "#f59e0b" : "#38bdf8";
+      context.stroke();
+    }
 
     context.fillStyle = "#164e63";
     context.fillText(point.label, point.xPx + 11, point.yPx);

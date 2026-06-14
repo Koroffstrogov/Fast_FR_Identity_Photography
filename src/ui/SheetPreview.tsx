@@ -102,7 +102,7 @@ export function SheetPreview({
           width="2480"
           height="3508"
           className={`sheet-canvas sheet-zoom-${zoom}`}
-          aria-label="Apercu planche A4 imprimable"
+        aria-label="Aperçu planche A4 imprimable"
         />
       </div>
     </div>
@@ -114,7 +114,7 @@ export function SheetPreview({
         <div className="stage-title-row">
           <div>
             <p className="eyebrow">Planche imprimable</p>
-            <h2 id="sheet-title">Apercu planche A4</h2>
+            <h2 id="sheet-title">Aperçu planche A4</h2>
           </div>
           <dl className="sheet-stage-stats">
             <div>
@@ -132,18 +132,18 @@ export function SheetPreview({
     <section className="sheet-section" aria-labelledby="sheet-title">
       <div className="sheet-copy">
         <p className="eyebrow">Planche imprimable</p>
-        <h2 id="sheet-title">Apercu planche A4</h2>
+        <h2 id="sheet-title">Aperçu planche A4</h2>
         <dl className="sheet-stats">
           <div>
             <dt>Mode</dt>
             <dd>{sheetMode === "standard" ? "Standard" : "Confort"}</dd>
           </div>
           <div>
-            <dt>Total demande</dt>
+            <dt>Total demandé</dt>
             <dd>{composition.requestedCount}</dd>
           </div>
           <div>
-            <dt>Capacite</dt>
+            <dt>Capacité</dt>
             <dd>{composition.capacity}</dd>
           </div>
           <div>
@@ -153,8 +153,8 @@ export function SheetPreview({
         </dl>
         {composition.isLimited && (
           <p className="warning" role="alert">
-            Le total depasse la capacite. L'aperçu et l'export sont limites aux{" "}
-            {composition.capacity} premieres photos.
+            Le total dépasse la capacité. L'aperçu et l'export sont limités aux{" "}
+            {composition.capacity} premières photos.
           </p>
         )}
       </div>

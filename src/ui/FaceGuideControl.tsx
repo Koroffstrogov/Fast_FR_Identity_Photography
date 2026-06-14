@@ -9,9 +9,9 @@ type FaceGuideControlProps = {
 };
 
 const FACE_GUIDE_LEVELS: Record<FaceGuideLevel, { label: string; opacity: number }> = {
-  hidden: { label: "Masque", opacity: 0 },
+  hidden: { label: "Masqué", opacity: 0 },
   subtle: { label: "Discret", opacity: 0.45 },
-  strong: { label: "Renforce", opacity: 0.82 },
+  strong: { label: "Renforcé", opacity: 0.82 },
 };
 
 export function FaceGuideControl({
@@ -52,9 +52,15 @@ export function FaceGuideControl({
         ))}
       </div>
       <p className="guide-note">
-        Gabarit base sur les recommandations francaises : visage 32-36 mm du
-        menton au sommet du crane, hors cheveux.
+        Gabarit France : visage 32-36 mm.
       </p>
+      <details className="guide-details">
+        <summary>Détails du gabarit</summary>
+        <p>
+          Repère indicatif : distance entre menton et sommet du crâne, hors cheveux,
+          avec cible visuelle à 34 mm.
+        </p>
+      </details>
     </fieldset>
   );
 }

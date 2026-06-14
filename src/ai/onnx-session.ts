@@ -172,7 +172,7 @@ export async function loadLocalOnnxModel(
     response = await fetchModel(probe.requestedUrl, { cache: "no-store" });
   } catch (error) {
     throw new Error(
-      `Modele ${getRmbgEngineLabelFromModelPath(modelPath)} inaccessible : ${modelPath}. URL testee : ${probe.requestedUrl}. ${formatUnknownError(error)}`,
+      `Modèle ${getRmbgEngineLabelFromModelPath(modelPath)} inaccessible : ${modelPath}. URL testée : ${probe.requestedUrl}. ${formatUnknownError(error)}`,
     );
   }
 
@@ -182,7 +182,7 @@ export async function loadLocalOnnxModel(
 
   if (!response.ok) {
     throw new Error(
-      `Modele ${getRmbgEngineLabelFromModelPath(modelPath)} introuvable. En developpement, placez le fichier dans ${getRmbgLocalModelPath(modelPath)}. URL testee : ${probe.requestedUrl} (HTTP ${response.status}).`,
+      `Modèle ${getRmbgEngineLabelFromModelPath(modelPath)} introuvable. En développement, placez le fichier dans ${getRmbgLocalModelPath(modelPath)}. URL testée : ${probe.requestedUrl} (HTTP ${response.status}).`,
     );
   }
 
@@ -195,11 +195,11 @@ export async function loadLocalOnnxModel(
   if (probe.contentType.includes("text/html") || looksLikeHtml(modelBytes)) {
     throw new Error(
       [
-        "Le chemin du modele renvoie l'application HTML.",
-        `Verifiez le port, le middleware Vite et la presence du fichier ${getRmbgLocalModelPath(modelPath)}.`,
-        "En build statique, fournissez vous-meme le modele a l'URL attendue.",
+        "Le chemin du modèle renvoie l'application HTML.",
+        `Vérifiez le port, le middleware Vite et la présence du fichier ${getRmbgLocalModelPath(modelPath)}.`,
+        "En build statique, fournissez vous-même le modèle à l'URL attendue.",
         `Origin courant : ${probe.currentOrigin ?? "inconnu"}.`,
-        `URL testee : ${probe.requestedUrl}.`,
+        `URL testée : ${probe.requestedUrl}.`,
         `Content-Type : ${probe.contentType || "inconnu"}.`,
       ].join(" "),
     );
@@ -207,7 +207,7 @@ export async function loadLocalOnnxModel(
 
   if (modelBytes.byteLength < MIN_ONNX_MODEL_SIZE_BYTES) {
     throw new Error(
-      `Modele ${getRmbgEngineLabelFromModelPath(modelPath)} incompatible ou incomplet : ${modelPath} ne contient que ${modelBytes.byteLength} octets.`,
+      `Modèle ${getRmbgEngineLabelFromModelPath(modelPath)} incompatible ou incomplet : ${modelPath} ne contient que ${modelBytes.byteLength} octets.`,
     );
   }
 
@@ -308,7 +308,7 @@ function getFallbackMessage(
     return undefined;
   }
 
-  return `Fallback CPU/WASM apres echec WebGPU : ${errors.join(" ")}`;
+  return `Fallback CPU/WASM après échec WebGPU : ${errors.join(" ")}`;
 }
 
 function formatAttemptError(attempt: BackendAttempt, error: unknown): string {
@@ -323,7 +323,7 @@ function formatSessionCreationError(
   const failureKind = classifyOnnxSessionCreationFailure(errors);
 
   if (failureKind === "session-create-error") {
-    return `Le modele ONNX est charge, mais ONNX Runtime Web ne peut pas creer la session : ${detail}`;
+    return `Le modèle ONNX est chargé, mais ONNX Runtime Web ne peut pas créer la session : ${detail}`;
   }
 
   if (failureKind === "wasm-missing") {
@@ -334,7 +334,7 @@ function formatSessionCreationError(
     return `WebGPU disponible mais session RMBG impossible. ${detail}`;
   }
 
-  return `Modele RMBG incompatible avec ONNX Runtime Web. ${detail}`;
+  return `Modèle RMBG incompatible avec ONNX Runtime Web. ${detail}`;
 }
 
 export function classifyOnnxSessionCreationFailure(

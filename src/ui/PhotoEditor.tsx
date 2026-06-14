@@ -7,6 +7,7 @@ import type { FaceLandmarkerModelStatus } from "../vision/face-landmarker";
 import { BackgroundPanel, BackgroundPointMode } from "./BackgroundPanel";
 import { FaceDetectionPanel } from "./FaceDetectionPanel";
 import { FaceGuideControl } from "./FaceGuideControl";
+import { EditorInteractionMode } from "./editor-interaction-mode";
 
 type PhotoEditorProps = {
   photo: PhotoItem | null;
@@ -22,10 +23,13 @@ type PhotoEditorProps = {
   onExportPhoto: () => void;
   faceModelStatus: FaceLandmarkerModelStatus;
   faceModelError: string;
+  editorInteractionMode: EditorInteractionMode;
   onLoadFaceModel: () => void;
   onPlaceFacePointsAutomatically: () => void;
-  onManualPlacementChange: (enabled: boolean) => void;
-  onMoveFacePointChange: (enabled: boolean) => void;
+  onEditorInteractionModeChange: (
+    mode: EditorInteractionMode,
+    options?: { resetFacePoints?: boolean },
+  ) => void;
   onFacePointsVisibilityChange: (showFacePoints: boolean) => void;
   onApplyFacePlacementFromPoints: () => void;
   onDeleteFacePoints: () => void;
@@ -54,10 +58,10 @@ export function PhotoEditor({
   onExportPhoto,
   faceModelStatus,
   faceModelError,
+  editorInteractionMode,
   onLoadFaceModel,
   onPlaceFacePointsAutomatically,
-  onManualPlacementChange,
-  onMoveFacePointChange,
+  onEditorInteractionModeChange,
   onFacePointsVisibilityChange,
   onApplyFacePlacementFromPoints,
   onDeleteFacePoints,
@@ -82,7 +86,7 @@ export function PhotoEditor({
           width={PHOTO_FORMAT.widthPx}
           height={PHOTO_FORMAT.heightPx}
           className={photo ? "photo-canvas is-draggable" : "photo-canvas"}
-          aria-label="Apercu photo 35 par 45 millimetres"
+          aria-label="Aperçu photo 35 par 45 millimètres"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerEnd}
@@ -135,10 +139,10 @@ export function PhotoEditor({
           photo={photo}
           modelStatus={faceModelStatus}
           modelError={faceModelError}
+          interactionMode={editorInteractionMode}
           onLoadModel={onLoadFaceModel}
           onPlaceFacePointsAutomatically={onPlaceFacePointsAutomatically}
-          onManualPlacementChange={onManualPlacementChange}
-          onMoveFacePointChange={onMoveFacePointChange}
+          onInteractionModeChange={onEditorInteractionModeChange}
           onFacePointsVisibilityChange={onFacePointsVisibilityChange}
           onApplyFacePlacementFromPoints={onApplyFacePlacementFromPoints}
           onDeleteFacePoints={onDeleteFacePoints}
@@ -160,7 +164,7 @@ export function PhotoEditor({
 
         <label className="slider-control">
           <span>Rotation</span>
-          <output>{transform ? transform.rotationDegrees.toFixed(1) : "0.0"} deg</output>
+          <output>{transform ? transform.rotationDegrees.toFixed(1) : "0.0"}°</output>
           <input
             aria-label="Rotation"
             type="range"
@@ -182,7 +186,7 @@ export function PhotoEditor({
             onClick={onResetPhoto}
             disabled={!photo}
           >
-            Reinitialiser
+            Réinitialiser
           </button>
           <button type="button" onClick={onExportPhoto} disabled={!photo}>
             Export JPEG

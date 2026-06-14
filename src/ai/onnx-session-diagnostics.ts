@@ -128,14 +128,14 @@ export function getDefaultDiagnosticVariants(): OnnxSessionDiagnosticVariant[] {
     },
     {
       id: "F",
-      label: "WASM depuis URL modele",
+      label: "WASM depuis URL modèle",
       provider: "wasm",
       graphOptimizationLevel: "disabled",
       source: "url",
     },
     {
       id: "G",
-      label: "WebGPU depuis URL modele",
+      label: "WebGPU depuis URL modèle",
       provider: "webgpu",
       graphOptimizationLevel: "disabled",
       source: "url",

@@ -47,14 +47,14 @@ export function BeforeAfterPreview({ photo }: BeforeAfterPreviewProps) {
   }, [photo]);
 
   return (
-    <div className="before-after-preview" aria-label="Apercu avant apres">
+    <div className="before-after-preview" aria-label="Aperçu avant après">
       <figure>
         <figcaption>Original</figcaption>
         <canvas
           ref={originalCanvasRef}
           width={PHOTO_FORMAT.widthPx}
           height={PHOTO_FORMAT.heightPx}
-          aria-label="Apercu original sans correction qualite"
+          aria-label="Aperçu original sans correction qualité"
         />
       </figure>
       <figure>
@@ -63,7 +63,7 @@ export function BeforeAfterPreview({ photo }: BeforeAfterPreviewProps) {
           ref={correctedCanvasRef}
           width={PHOTO_FORMAT.widthPx}
           height={PHOTO_FORMAT.heightPx}
-          aria-label="Apercu corrige exporte"
+          aria-label="Aperçu corrigé exporté"
         />
       </figure>
     </div>

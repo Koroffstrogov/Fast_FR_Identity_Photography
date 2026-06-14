@@ -69,13 +69,13 @@ export async function segmentImageBackground(
 export function getBackgroundSegmenterErrorMessage(error: unknown): string {
   const detail = error instanceof Error ? error.message : String(error);
 
-  if (detail.startsWith("Impossible de charger le modele de fond local.")) {
+  if (detail.startsWith("Impossible de charger le modèle de fond local.")) {
     return detail;
   }
 
   return [
-    "Impossible de charger le modele de fond local.",
-    `Verifiez la presence de ${BACKGROUND_SEGMENTER_MODEL_PATH} et des fichiers WASM dans ${FACE_LANDMARKER_WASM_PATH}.`,
+    "Impossible de charger le modèle de fond local.",
+    `Vérifiez la présence de ${BACKGROUND_SEGMENTER_MODEL_PATH} et des fichiers WASM dans ${FACE_LANDMARKER_WASM_PATH}.`,
     detail,
   ].join(" ");
 }
@@ -107,7 +107,7 @@ function createBackgroundSegmentationResult(
     };
   }
 
-  throw new Error("Le modele n'a retourne aucun masque exploitable.");
+    throw new Error("Le modèle n'a retourné aucun masque exploitable.");
 }
 
 async function createBackgroundSegmenter(): Promise<ImageSegmenter> {
@@ -132,7 +132,7 @@ async function loadLocalBackgroundModel(): Promise<Uint8Array> {
 
   if (!response.ok) {
     throw new Error(
-      `Le fichier modele est introuvable : ${BACKGROUND_SEGMENTER_MODEL_PATH} (HTTP ${response.status}).`,
+      `Le fichier modèle est introuvable : ${BACKGROUND_SEGMENTER_MODEL_PATH} (HTTP ${response.status}).`,
     );
   }
 
@@ -141,13 +141,13 @@ async function loadLocalBackgroundModel(): Promise<Uint8Array> {
 
   if (contentType.includes("text/html") || looksLikeHtml(modelBuffer)) {
     throw new Error(
-      `Le chemin ${BACKGROUND_SEGMENTER_MODEL_PATH} renvoie une page HTML au lieu du modele .tflite.`,
+      `Le chemin ${BACKGROUND_SEGMENTER_MODEL_PATH} renvoie une page HTML au lieu du modèle .tflite.`,
     );
   }
 
   if (modelBuffer.byteLength < MIN_SEGMENTER_MODEL_SIZE_BYTES) {
     throw new Error(
-      `Le fichier modele ${BACKGROUND_SEGMENTER_MODEL_PATH} est trop petit (${modelBuffer.byteLength} octets). Il est probablement incomplet.`,
+      `Le fichier modèle ${BACKGROUND_SEGMENTER_MODEL_PATH} est trop petit (${modelBuffer.byteLength} octets). Il est probablement incomplet.`,
     );
   }
 

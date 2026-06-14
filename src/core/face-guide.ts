@@ -67,7 +67,7 @@ export function getFranceOfficialFaceGuide(): FaceGuide {
       id: "skull-top-tolerance",
       topYMm: guide.skullTopYForFaceMaxMm,
       bottomYMm: guide.skullTopYForFaceMinMm,
-      label: "Tolerance sommet du crane",
+      label: "Tolérance sommet du crâne",
     },
     chinLine: {
       id: "chin",

@@ -79,7 +79,7 @@ describe("RMBG output extraction", () => {
 
   it("rejects an unknown configured output name", () => {
     expect(() => selectModelTensorName(["alpha"], "mask", "output")).toThrow(
-      "Nom output configure introuvable",
+      "Nom output configuré introuvable",
     );
   });
 
