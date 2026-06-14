@@ -8,7 +8,11 @@ import {
   OnnxSessionLike,
   createConfiguredOnnxSession,
 } from "../ai/onnx-session";
-import { RMBG2_DEFAULT_CONFIG, Rmbg2ModelConfig } from "./rmbg2-config";
+import {
+  RMBG2_DEFAULT_CONFIG,
+  Rmbg2ModelConfig,
+  getRmbgEngineLabel,
+} from "./rmbg2-config";
 import {
   BackgroundRemovalResult,
   BackgroundRemovalRunner,
@@ -89,7 +93,7 @@ export class Rmbg2BackgroundRemovalRunner implements BackgroundRemovalRunner {
     const loadedSession = this.loadedSession;
 
     if (!loadedSession) {
-      throw new Error("Session RMBG-2.0 non initialisee.");
+      throw new Error(`Session ${getRmbgEngineLabel(config.engine)} non initialisee.`);
     }
 
     const input = preprocessImageElementForRmbg2(image, config);
@@ -125,7 +129,7 @@ export class Rmbg2BackgroundRemovalRunner implements BackgroundRemovalRunner {
       mask: outputSelection.mask,
       diagnostics: nextDiagnostics,
       messages: [
-        "Fond supprime avec RMBG-2.0. Comparez Original, Masque et Fond remplace avant export.",
+        `Fond supprime avec ${getRmbgEngineLabel(config.engine)}. Comparez Original, Masque et Fond remplace avant export.`,
         ...(nextDiagnostics.fallbackMessage ? [nextDiagnostics.fallbackMessage] : []),
       ],
     };

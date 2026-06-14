@@ -1,9 +1,9 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
-import { rmbg2LocalModelPlugin } from "./vite.rmbg-model";
+import { rmbgLocalModelPlugin } from "./vite.rmbg-model";
 
 export default defineConfig({
-  plugins: [rmbg2LocalModelPlugin(), react()],
+  plugins: [rmbgLocalModelPlugin(), react()],
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],

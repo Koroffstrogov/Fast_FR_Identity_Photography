@@ -1,18 +1,23 @@
 import {
   BackgroundEditState,
+  BackgroundRemovalEngine,
   BackgroundRemovalBackendPreference,
   BackgroundPreviewMode,
+  OnnxSessionDiagnosticResult,
   getDefaultBackgroundEditState,
 } from "../core/photo-project";
 import { getRuntimeCapabilities } from "../ai/runtime-capabilities";
 import { BackgroundRemovalStatus } from "../background/background-removal";
 import {
   RMBG2_DEFAULT_CONFIG,
-  RMBG2_ENGINE_LABEL,
-  RMBG2_MODEL_OPTIONS,
-  getRmbg2LocalModelPath,
-  getRmbg2ModelFileName,
-  getRmbg2ModelOption,
+  RMBG_ENGINE_OPTIONS,
+  getDefaultRmbgModelPathForEngine,
+  getRmbgEngineForModelPath,
+  getRmbgEngineLabel,
+  getRmbgLocalModelPath,
+  getRmbgModelFileName,
+  getRmbgModelOption,
+  getRmbgModelOptionsForEngine,
 } from "../background/rmbg2-config";
 
 export type BackgroundPointMode = "none" | "foreground" | "background";
@@ -24,6 +29,7 @@ type BackgroundPanelProps = {
   removalError: string;
   pointMode: BackgroundPointMode;
   onLoadModel: () => void;
+  onDiagnoseSession?: () => void;
   onRemoveBackground: () => void;
   onBackgroundChange: (partialEdit: Partial<BackgroundEditState>) => void;
   onPointModeChange: (mode: BackgroundPointMode) => void;
@@ -38,6 +44,7 @@ export function BackgroundPanel({
   removalError,
   pointMode,
   onLoadModel,
+  onDiagnoseSession,
   onRemoveBackground,
   onBackgroundChange,
   onPointModeChange,
@@ -51,8 +58,15 @@ export function BackgroundPanel({
   const diagnostics = edit.technicalDiagnostics;
   const browserOrigin = getBrowserOrigin();
   const selectedModelPath = edit.modelPath || RMBG2_DEFAULT_CONFIG.modelPath;
-  const selectedModelOption = getRmbg2ModelOption(selectedModelPath);
-  const selectedModelName = selectedModelOption?.label ?? getRmbg2ModelFileName(selectedModelPath);
+  const inferredEngine = getRmbgEngineForModelPath(selectedModelPath);
+  const selectedEngine =
+    edit.engine === "legacy" || edit.engine !== inferredEngine
+      ? inferredEngine
+      : edit.engine;
+  const selectedModelOptions = getRmbgModelOptionsForEngine(selectedEngine);
+  const selectedModelOption = getRmbgModelOption(selectedModelPath);
+  const selectedModelName =
+    selectedModelOption?.label ?? getRmbgModelFileName(selectedModelPath);
   const fallbackModelUrl = getModelUrlForOrigin(browserOrigin, selectedModelPath);
   const navigatorGpuAvailable =
     diagnostics?.navigatorGpuAvailable ?? getRuntimeCapabilities().navigatorGpuAvailable;
@@ -61,22 +75,50 @@ export function BackgroundPanel({
     <fieldset className="background-panel">
       <legend>Fond</legend>
 
-      <p className="model-status">Moteur : {RMBG2_ENGINE_LABEL}</p>
+      <label className="select-control">
+        <span>Moteur</span>
+        <select
+          aria-label="Moteur fond"
+          value={selectedEngine}
+          onChange={(event) => {
+            const engine = event.currentTarget.value as BackgroundRemovalEngine;
+
+            onBackgroundChange({
+              engine,
+              modelPath: getDefaultRmbgModelPathForEngine(engine),
+            });
+          }}
+          disabled={disabled || isBusy}
+        >
+          {RMBG_ENGINE_OPTIONS.map((option) => (
+            <option key={option.engine} value={option.engine}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="model-status">
+        {getRmbgEngineLabel(selectedEngine)} :{" "}
+        {RMBG_ENGINE_OPTIONS.find((option) => option.engine === selectedEngine)?.description}
+      </p>
       <p className="model-status">Etat modele : {getRemovalStatusLabel(removalStatus)}</p>
 
       <label className="select-control">
-        <span>Modele RMBG</span>
+        <span>Modele</span>
         <select
           aria-label="Modele RMBG"
           value={selectedModelPath}
-          onChange={(event) =>
+          onChange={(event) => {
+            const modelPath = event.currentTarget.value;
+
             onBackgroundChange({
-              modelPath: event.currentTarget.value,
-            })
-          }
+              engine: getRmbgEngineForModelPath(modelPath),
+              modelPath,
+            });
+          }}
           disabled={disabled || isBusy}
         >
-          {RMBG2_MODEL_OPTIONS.map((option) => (
+          {selectedModelOptions.map((option) => (
             <option key={option.modelPath} value={option.modelPath}>
               {option.label}
             </option>
@@ -115,6 +157,17 @@ export function BackgroundPanel({
       >
         Charger / verifier le modele
       </button>
+
+      {onDiagnoseSession && (
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={onDiagnoseSession}
+          disabled={disabled || isBusy}
+        >
+          Diagnostiquer session ONNX
+        </button>
+      )}
 
       <button
         type="button"
@@ -273,6 +326,10 @@ export function BackgroundPanel({
 
       <dl className="background-diagnostics" aria-label="Diagnostics techniques fond">
         <div>
+          <dt>Moteur</dt>
+          <dd>{getRmbgEngineLabel(diagnostics?.engine ?? selectedEngine)}</dd>
+        </div>
+        <div>
           <dt>WebGPU</dt>
           <dd>{navigatorGpuAvailable ? "oui" : "non"}</dd>
         </div>
@@ -323,8 +380,8 @@ export function BackgroundPanel({
         <p>Assets WASM : {diagnostics?.ortWasmPath ?? "/ort/"}</p>
         <p>Origin courant : {diagnostics?.currentOrigin ?? browserOrigin ?? "-"}</p>
         <p>Modele : {diagnostics?.modelPath ?? selectedModelPath}</p>
-        <p>Nom modele : {getRmbg2ModelFileName(diagnostics?.modelPath ?? selectedModelPath)}</p>
-        <p>Fichier local dev : {getRmbg2LocalModelPath(selectedModelPath)}</p>
+        <p>Nom modele : {getRmbgModelFileName(diagnostics?.modelPath ?? selectedModelPath)}</p>
+        <p>Fichier local dev : {getRmbgLocalModelPath(selectedModelPath)}</p>
         <p>URL testee : {diagnostics?.modelUrl ?? fallbackModelUrl}</p>
         <p>HTTP modele : {diagnostics?.modelHttpStatus ?? "-"}</p>
         <p>Content-Type modele : {diagnostics?.modelContentType ?? "-"}</p>
@@ -333,6 +390,41 @@ export function BackgroundPanel({
           <p className="warning">{diagnostics.fallbackMessage}</p>
         )}
       </details>
+
+      {edit.sessionDiagnostics.length > 0 && (
+        <details className="technical-details" open>
+          <summary>Diagnostic creation session</summary>
+          <div className="diagnostic-table-wrap">
+            <table className="diagnostic-table">
+              <thead>
+                <tr>
+                  <th>Variante</th>
+                  <th>Moteur</th>
+                  <th>Provider</th>
+                  <th>Graphe</th>
+                  <th>Source</th>
+                  <th>Resultat</th>
+                </tr>
+              </thead>
+              <tbody>
+                {edit.sessionDiagnostics.map((result) => (
+                  <tr key={result.id}>
+                    <td>{result.id}</td>
+                    <td>{getRmbgEngineLabel(result.engine)}</td>
+                    <td>{result.provider}</td>
+                    <td>{formatGraphOptimization(result)}</td>
+                    <td>{result.source}</td>
+                    <td>
+                      {result.sessionCreated ? "OK" : "Echec"}
+                      <small>{formatSessionDiagnosticDetail(result)}</small>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
 
       <div className="background-point-controls">
         <button
@@ -464,7 +556,7 @@ function getLoadedModelLabel(
     return fallbackLabel;
   }
 
-  return getRmbg2ModelOption(loadedModelPath)?.label ?? getRmbg2ModelFileName(loadedModelPath);
+  return getRmbgModelOption(loadedModelPath)?.label ?? getRmbgModelFileName(loadedModelPath);
 }
 
 function formatBytes(value: number | undefined): string {
@@ -482,4 +574,21 @@ function formatBytes(value: number | undefined): string {
 
 function formatNames(names: string[] | undefined): string {
   return names && names.length > 0 ? names.join(", ") : "-";
+}
+
+function formatGraphOptimization(result: OnnxSessionDiagnosticResult): string {
+  return [
+    result.graphOptimizationLevel,
+    result.executionMode ? `mode ${result.executionMode}` : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+function formatSessionDiagnosticDetail(result: OnnxSessionDiagnosticResult): string {
+  if (result.sessionCreated) {
+    return ` ${result.durationMs} ms, inputs ${formatNames(result.inputNames)}, outputs ${formatNames(result.outputNames)}`;
+  }
+
+  return ` ${result.durationMs} ms, ${result.error ?? "erreur inconnue"}`;
 }

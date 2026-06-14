@@ -15,10 +15,10 @@ import {
   resolveBackgroundBackend,
 } from "./runtime-capabilities";
 import {
-  RMBG2_DEFAULT_CONFIG,
-  RMBG2_MODEL_DIRECTORY,
   Rmbg2ModelConfig,
-  getRmbg2LocalModelPath,
+  RMBG2_DEFAULT_CONFIG,
+  getRmbgEngineLabel,
+  getRmbgLocalModelPath,
 } from "../background/rmbg2-config";
 
 export type { OnnxRuntimeApi, OnnxSessionLike, OnnxTensorLike };
@@ -37,6 +37,11 @@ export class OnnxSessionCreationError extends Error {
     this.name = "OnnxSessionCreationError";
   }
 }
+
+export type OnnxSessionCreationFailureKind =
+  | "session-create-error"
+  | "wasm-missing"
+  | "model-incompatible";
 
 export type OnnxModelProbe = {
   requestedPath: string;
@@ -110,6 +115,7 @@ export async function createConfiguredOnnxSession({
         session,
         diagnostics: {
           navigatorGpuAvailable: capabilities.navigatorGpuAvailable,
+          engine: config.engine,
           requestedBackend: backendPreference,
           activeBackend: attempt.activeBackend,
           provider: attempt.provider,
@@ -166,7 +172,7 @@ export async function loadLocalOnnxModel(
     response = await fetchModel(probe.requestedUrl, { cache: "no-store" });
   } catch (error) {
     throw new Error(
-      `Modele RMBG-2.0 inaccessible : ${modelPath}. URL testee : ${probe.requestedUrl}. ${formatUnknownError(error)}`,
+      `Modele ${getRmbgEngineLabelFromModelPath(modelPath)} inaccessible : ${modelPath}. URL testee : ${probe.requestedUrl}. ${formatUnknownError(error)}`,
     );
   }
 
@@ -176,7 +182,7 @@ export async function loadLocalOnnxModel(
 
   if (!response.ok) {
     throw new Error(
-      `Modele RMBG-2.0 introuvable dans ${RMBG2_MODEL_DIRECTORY}. En developpement, placez le fichier dans ${getRmbg2LocalModelPath(modelPath)}. URL testee : ${probe.requestedUrl} (HTTP ${response.status}).`,
+      `Modele ${getRmbgEngineLabelFromModelPath(modelPath)} introuvable. En developpement, placez le fichier dans ${getRmbgLocalModelPath(modelPath)}. URL testee : ${probe.requestedUrl} (HTTP ${response.status}).`,
     );
   }
 
@@ -190,7 +196,7 @@ export async function loadLocalOnnxModel(
     throw new Error(
       [
         "Le chemin du modele renvoie l'application HTML.",
-        `Verifiez le port, le middleware Vite et la presence du fichier ${getRmbg2LocalModelPath(modelPath)}.`,
+        `Verifiez le port, le middleware Vite et la presence du fichier ${getRmbgLocalModelPath(modelPath)}.`,
         "En build statique, fournissez vous-meme le modele a l'URL attendue.",
         `Origin courant : ${probe.currentOrigin ?? "inconnu"}.`,
         `URL testee : ${probe.requestedUrl}.`,
@@ -201,7 +207,7 @@ export async function loadLocalOnnxModel(
 
   if (modelBytes.byteLength < MIN_ONNX_MODEL_SIZE_BYTES) {
     throw new Error(
-      `Modele RMBG-2.0 incompatible ou incomplet : ${modelPath} ne contient que ${modelBytes.byteLength} octets.`,
+      `Modele ${getRmbgEngineLabelFromModelPath(modelPath)} incompatible ou incomplet : ${modelPath} ne contient que ${modelBytes.byteLength} octets.`,
     );
   }
 
@@ -249,6 +255,7 @@ function createBaseDiagnostics({
   provider: string;
 }): BackgroundTechnicalDiagnostics {
   return {
+    engine: config.engine,
     navigatorGpuAvailable: getRuntimeCapabilities().navigatorGpuAvailable,
     requestedBackend: backendPreference,
     activeBackend: "none",
@@ -313,16 +320,56 @@ function formatSessionCreationError(
   errors: readonly string[],
 ): string {
   const detail = errors.join(" ");
+  const failureKind = classifyOnnxSessionCreationFailure(errors);
 
-  if (detail.toLowerCase().includes("wasm")) {
+  if (failureKind === "session-create-error") {
+    return `Le modele ONNX est charge, mais ONNX Runtime Web ne peut pas creer la session : ${detail}`;
+  }
+
+  if (failureKind === "wasm-missing") {
     return `.wasm ONNX introuvable ou inaccessible dans /ort/. ${detail}`;
   }
 
   if (backendPreference === "gpu") {
-    return `WebGPU disponible mais session RMBG-2.0 impossible. ${detail}`;
+    return `WebGPU disponible mais session RMBG impossible. ${detail}`;
   }
 
-  return `Modele RMBG-2.0 incompatible avec ONNX Runtime Web. ${detail}`;
+  return `Modele RMBG incompatible avec ONNX Runtime Web. ${detail}`;
+}
+
+export function classifyOnnxSessionCreationFailure(
+  errors: readonly string[] | string,
+): OnnxSessionCreationFailureKind {
+  const detail = (typeof errors === "string" ? errors : errors.join(" ")).toLowerCase();
+
+  if (isModelSessionCreationError(detail)) {
+    return "session-create-error";
+  }
+
+  if (isWasmRuntimeAssetError(detail)) {
+    return "wasm-missing";
+  }
+
+  return "model-incompatible";
+}
+
+function isModelSessionCreationError(detail: string): boolean {
+  return (
+    detail.includes("shapeinferenceerror") ||
+    detail.includes("shape inference") ||
+    detail.includes("mismatch between number of inferred and declared dimensions") ||
+    detail.includes("inferred=4 declared=6")
+  );
+}
+
+function isWasmRuntimeAssetError(detail: string): boolean {
+  return (
+    detail.includes(".wasm") ||
+    detail.includes("failed to fetch dynamically imported module") ||
+    detail.includes("failed to load module script") ||
+    detail.includes("webassembly") ||
+    detail.includes("wasm streaming compile failed")
+  );
 }
 
 function looksLikeHtml(buffer: Uint8Array): boolean {
@@ -335,11 +382,25 @@ function looksLikeHtml(buffer: Uint8Array): boolean {
 }
 
 function formatUnknownError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+
+  if (!error.name || error.name === "Error" || error.message.includes(error.name)) {
+    return error.message;
+  }
+
+  return `${error.name}: ${error.message}`;
 }
 
 function defaultNow(): number {
   return typeof performance === "undefined" ? Date.now() : performance.now();
+}
+
+function getRmbgEngineLabelFromModelPath(modelPath: string): string {
+  return getRmbgEngineLabel(
+    modelPath.includes("/rmbg2/") ? "rmbg2" : "rmbg1.4",
+  );
 }
 
 function logOrtRuntimeConfig(runtime: OnnxRuntimeApi): void {

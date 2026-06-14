@@ -3,7 +3,8 @@ import { Rmbg2ModelConfig } from "./rmbg2-config";
 import { preprocessImageDataForRmbg2 } from "./rmbg2-preprocess";
 
 const TEST_CONFIG: Rmbg2ModelConfig = {
-  modelPath: "/models/rmbg2/model_fp16.onnx",
+  engine: "rmbg1.4",
+  modelPath: "/models/rmbg1.4/model_fp16.onnx",
   ortWasmPath: "/ort/",
   inputWidth: 2,
   inputHeight: 1,
@@ -13,7 +14,7 @@ const TEST_CONFIG: Rmbg2ModelConfig = {
   },
 };
 
-describe("RMBG-2.0 preprocessing", () => {
+describe("RMBG preprocessing", () => {
   it("converts RGBA pixels to normalized NCHW float32 RGB", () => {
     const tensor = preprocessImageDataForRmbg2(
       {
@@ -46,6 +47,6 @@ describe("RMBG-2.0 preprocessing", () => {
         },
         TEST_CONFIG,
       ),
-    ).toThrow("RMBG-2.0 attend une image 2x1");
+    ).toThrow("RMBG attend une image 2x1");
   });
 });

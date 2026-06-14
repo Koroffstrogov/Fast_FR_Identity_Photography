@@ -14,7 +14,7 @@ export type PhotoUsage = "college" | "sport" | "badge" | "autre";
 
 export type BackgroundPreviewMode = "original" | "replace" | "mask-preview";
 
-export type BackgroundRemovalEngine = "rmbg2" | "legacy";
+export type BackgroundRemovalEngine = "rmbg1.4" | "rmbg2" | "legacy";
 
 export type BackgroundRemovalBackendPreference = "auto" | "gpu" | "cpu";
 
@@ -30,10 +30,11 @@ export type BackgroundMaskData = {
   height: number;
   data: Float32Array;
   labels: string[];
-  source: "confidence" | "category" | "rmbg2";
+  source: "confidence" | "category" | "rmbg";
 };
 
 export type BackgroundTechnicalDiagnostics = {
+  engine: BackgroundRemovalEngine;
   navigatorGpuAvailable: boolean;
   requestedBackend: BackgroundRemovalBackendPreference;
   activeBackend: BackgroundRemovalActiveBackend;
@@ -59,6 +60,23 @@ export type BackgroundTechnicalDiagnostics = {
   fallbackMessage?: string;
 };
 
+export type OnnxSessionDiagnosticResult = {
+  id: string;
+  label: string;
+  engine: BackgroundRemovalEngine;
+  modelUrl: string;
+  byteLength: number;
+  provider: "webgpu" | "wasm";
+  graphOptimizationLevel: "default" | "disabled" | "basic" | "extended" | "all";
+  source: "url" | "buffer";
+  executionMode?: "sequential" | "parallel";
+  sessionCreated: boolean;
+  durationMs: number;
+  inputNames: string[];
+  outputNames: string[];
+  error?: string;
+};
+
 export type BackgroundEditState = {
   engine: BackgroundRemovalEngine;
   modelPath: string;
@@ -76,6 +94,7 @@ export type BackgroundEditState = {
   maskVersion: number;
   rawMask?: BackgroundMaskData;
   technicalDiagnostics?: BackgroundTechnicalDiagnostics;
+  sessionDiagnostics: OnnxSessionDiagnosticResult[];
   message: string;
 };
 
@@ -138,7 +157,7 @@ export type CreatePhotoItemInput<TImage = HTMLImageElement> = {
 export const DEFAULT_FACE_GUIDE_OPACITY = 0.82;
 export const DEFAULT_SHEET_COPIES = 1;
 export const DEFAULT_BACKGROUND_REPLACEMENT_COLOR = "#eeeeee";
-export const DEFAULT_BACKGROUND_MODEL_PATH = "/models/rmbg2/model_fp16.onnx";
+export const DEFAULT_BACKGROUND_MODEL_PATH = "/models/rmbg1.4/model_fp16.onnx";
 
 export function getDefaultPhotoEditState(): PhotoEditState {
   return {
@@ -162,7 +181,7 @@ export function getDefaultPhotoFaceDetectionState(): PhotoFaceDetectionState {
 
 export function getDefaultBackgroundEditState(): BackgroundEditState {
   return {
-    engine: "rmbg2",
+    engine: "rmbg1.4",
     modelPath: DEFAULT_BACKGROUND_MODEL_PATH,
     enabled: false,
     backendPreference: "auto",
@@ -178,6 +197,7 @@ export function getDefaultBackgroundEditState(): BackgroundEditState {
     maskVersion: 0,
     rawMask: undefined,
     technicalDiagnostics: undefined,
+    sessionDiagnostics: [],
     message: "",
   };
 }

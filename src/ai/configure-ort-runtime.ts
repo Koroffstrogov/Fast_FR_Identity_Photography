@@ -9,8 +9,8 @@ export type OnnxRuntimeApi = {
   };
   InferenceSession: {
     create(
-      model: Uint8Array,
-      options: { executionProviders: readonly string[]; graphOptimizationLevel?: string },
+      model: Uint8Array | string,
+      options: OnnxSessionCreateOptions,
     ): Promise<OnnxSessionLike>;
   };
   Tensor: new (
@@ -30,6 +30,16 @@ export type OnnxSessionLike = {
 export type OnnxTensorLike = {
   readonly data: unknown;
   readonly dims: readonly number[];
+};
+
+export type OnnxGraphOptimizationLevel = "disabled" | "basic" | "extended" | "all";
+
+export type OnnxExecutionMode = "sequential" | "parallel";
+
+export type OnnxSessionCreateOptions = {
+  executionProviders: readonly string[];
+  graphOptimizationLevel?: OnnxGraphOptimizationLevel;
+  executionMode?: OnnxExecutionMode;
 };
 
 export type OnnxWasmPaths =

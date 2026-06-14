@@ -1,11 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   OnnxRuntimeApi,
+  classifyOnnxSessionCreationFailure,
   createModelProbe,
   createConfiguredOnnxSession,
   loadLocalOnnxModel,
 } from "./onnx-session";
-import { ORT_WASM_ASSET_PATHS } from "./configure-ort-runtime";
+import {
+  ORT_WASM_ASSET_PATHS,
+  OnnxSessionCreateOptions,
+} from "./configure-ort-runtime";
 
 describe("ONNX session setup", () => {
   afterEach(() => {
@@ -32,6 +36,7 @@ describe("ONNX session setup", () => {
       expect.any(Uint8Array),
       expect.objectContaining({ executionProviders: ["wasm"] }),
     );
+    expect(created.diagnostics.engine).toBe("rmbg1.4");
     expect(created.diagnostics.activeBackend).toBe("wasm");
     expect(created.diagnostics.provider).toBe("wasm");
     expect(created.diagnostics.inputNames).toEqual(["input"]);
@@ -73,15 +78,52 @@ describe("ONNX session setup", () => {
         runtime,
         modelBytes: new Uint8Array(2048),
       }),
-    ).rejects.toThrow("WebGPU disponible mais session RMBG-2.0 impossible");
+    ).rejects.toThrow("WebGPU disponible mais session RMBG impossible");
+  });
+
+  it("classifies shape inference failures as session creation errors", () => {
+    expect(
+      classifyOnnxSessionCreationFailure(
+        "ShapeInferenceError: Mismatch between number of inferred and declared dimensions. inferred=4 declared=6",
+      ),
+    ).toBe("session-create-error");
+  });
+
+  it("does not classify RMBG shape inference failures as missing WASM assets", async () => {
+    const shapeError = new Error(
+      "Mismatch between number of inferred and declared dimensions. inferred=4 declared=6",
+    );
+    shapeError.name = "ShapeInferenceError";
+    const runtime = createMockRuntime({
+      failProvider: "wasm",
+      failWith: shapeError,
+    });
+
+    await expect(
+      createConfiguredOnnxSession({
+        backendPreference: "cpu",
+        runtime,
+        modelBytes: new Uint8Array(2048),
+      }),
+    ).rejects.toThrow(
+      "Le modele ONNX est charge, mais ONNX Runtime Web ne peut pas creer la session",
+    );
+
+    await expect(
+      createConfiguredOnnxSession({
+        backendPreference: "cpu",
+        runtime,
+        modelBytes: new Uint8Array(2048),
+      }),
+    ).rejects.not.toThrow(".wasm ONNX introuvable");
   });
 
   it("loads the local model and reports missing files clearly", async () => {
     const response = new Response("missing", { status: 404 });
 
     await expect(
-      loadLocalOnnxModel("/models/rmbg2/model_fp16.onnx", async () => response),
-    ).rejects.toThrow("Modele RMBG-2.0 introuvable");
+      loadLocalOnnxModel("/models/rmbg1.4/model_fp16.onnx", async () => response),
+    ).rejects.toThrow("Modele RMBG-1.4 ONNX introuvable");
   });
 
   it("reports Vite HTML fallback before ONNX session creation", async () => {
@@ -110,27 +152,27 @@ describe("ONNX session setup", () => {
       location: { origin: "http://127.0.0.1:5173" },
     });
 
-    expect(createModelProbe("/models/rmbg2/model_fp16.onnx", () => 123)).toEqual({
-      requestedPath: "/models/rmbg2/model_fp16.onnx",
+    expect(createModelProbe("/models/rmbg1.4/model_fp16.onnx", () => 123)).toEqual({
+      requestedPath: "/models/rmbg1.4/model_fp16.onnx",
       requestedUrl:
-        "http://127.0.0.1:5173/models/rmbg2/model_fp16.onnx?cacheBust=123",
+        "http://127.0.0.1:5173/models/rmbg1.4/model_fp16.onnx?cacheBust=123",
       currentOrigin: "http://127.0.0.1:5173",
     });
   });
 });
 
 function createMockRuntime(
-  options: { failProvider?: "webgpu" | "wasm" } = {},
+  options: { failProvider?: "webgpu" | "wasm"; failWith?: Error } = {},
 ): OnnxRuntimeApi {
   const create = vi.fn(
     async (
-      _model: Uint8Array,
-      sessionOptions: { executionProviders: readonly string[] },
+      _model: Uint8Array | string,
+      sessionOptions: OnnxSessionCreateOptions,
     ) => {
       const provider = sessionOptions.executionProviders[0];
 
       if (provider === options.failProvider) {
-        throw new Error(`${provider} failed`);
+        throw options.failWith ?? new Error(`${provider} failed`);
       }
 
       return {

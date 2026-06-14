@@ -33,6 +33,7 @@ type RightInspectorProps = {
   onApplyFacePlacementFromPoints: () => void;
   onDeleteFacePoints: () => void;
   onLoadBackgroundModel: () => void;
+  onDiagnoseBackgroundSession: () => void;
   onRemoveBackground: () => void;
   onBackgroundChange: (partialEdit: Partial<NonNullable<PhotoItem["backgroundEdit"]>>) => void;
   onBackgroundPointModeChange: (mode: BackgroundPointMode) => void;
@@ -73,6 +74,7 @@ export function RightInspector({
   onApplyFacePlacementFromPoints,
   onDeleteFacePoints,
   onLoadBackgroundModel,
+  onDiagnoseBackgroundSession,
   onRemoveBackground,
   onBackgroundChange,
   onBackgroundPointModeChange,
@@ -127,6 +129,7 @@ export function RightInspector({
           removalError={backgroundRemovalError}
           pointMode={backgroundPointMode}
           onLoadModel={onLoadBackgroundModel}
+          onDiagnoseSession={onDiagnoseBackgroundSession}
           onRemoveBackground={onRemoveBackground}
           onBackgroundChange={onBackgroundChange}
           onPointModeChange={onBackgroundPointModeChange}

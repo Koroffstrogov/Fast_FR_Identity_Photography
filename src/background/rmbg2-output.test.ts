@@ -3,7 +3,8 @@ import { Rmbg2ModelConfig } from "./rmbg2-config";
 import { extractRmbg2AlphaMask, selectModelTensorName } from "./rmbg2-output";
 
 const TEST_CONFIG: Rmbg2ModelConfig = {
-  modelPath: "/models/rmbg2/model_fp16.onnx",
+  engine: "rmbg1.4",
+  modelPath: "/models/rmbg1.4/model_fp16.onnx",
   ortWasmPath: "/ort/",
   inputWidth: 2,
   inputHeight: 2,
@@ -13,7 +14,7 @@ const TEST_CONFIG: Rmbg2ModelConfig = {
   },
 };
 
-describe("RMBG-2.0 output extraction", () => {
+describe("RMBG output extraction", () => {
   it("keeps a progressive float alpha matte", () => {
     const selection = extractRmbg2AlphaMask(
       {
@@ -27,7 +28,7 @@ describe("RMBG-2.0 output extraction", () => {
     );
 
     expect(selection.outputName).toBe("alpha");
-    expect(selection.mask.source).toBe("rmbg2");
+    expect(selection.mask.source).toBe("rmbg");
     expect(selection.mask.width).toBe(2);
     expect(selection.mask.height).toBe(2);
     expect([...selection.mask.data]).toEqual([0, 0.25, 0.5, 1]);
@@ -74,6 +75,6 @@ describe("RMBG-2.0 output extraction", () => {
         ["output"],
         TEST_CONFIG,
       ),
-    ).toThrow("Shape de sortie RMBG-2.0 inattendue");
+    ).toThrow("Shape de sortie RMBG inattendue");
   });
 });

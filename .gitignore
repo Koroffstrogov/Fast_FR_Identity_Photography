@@ -11,6 +11,13 @@ public/models/mediapipe/*.tflite
 
 # Local AI models - do not commit
 /local-models/
+public/models/rmbg1.4/*.onnx
+public/models/rmbg1.4/*.ort
+public/models/rmbg1.4/*.bin
+public/models/rmbg1.4/*.data
+public/models/rmbg1.4/*.safetensors
+public/models/rmbg1.4/*.pth
+public/models/rmbg1.4/*.pt
 public/models/rmbg2/*.onnx
 public/models/rmbg2/*.ort
 public/models/rmbg2/*.bin

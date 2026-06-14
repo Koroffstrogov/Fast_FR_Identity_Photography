@@ -61,17 +61,18 @@ export function getBackgroundRemovalErrorMessage(error: unknown): string {
   const detail = error instanceof Error ? error.message : String(error);
 
   if (
-    detail.startsWith("Modele RMBG-2.0") ||
+    detail.startsWith("Modele RMBG") ||
+    detail.startsWith("Le modele ONNX est charge") ||
     detail.startsWith(".wasm ONNX") ||
     detail.startsWith("WebGPU") ||
     detail.startsWith("Le chemin du modele renvoie l'application HTML") ||
-    detail.startsWith("Sortie modele RMBG-2.0") ||
-    detail.startsWith("Shape de sortie RMBG-2.0")
+    detail.startsWith("Sortie modele RMBG") ||
+    detail.startsWith("Shape de sortie RMBG")
   ) {
     return detail;
   }
 
-  return `Impossible de supprimer le fond avec RMBG-2.0. ${detail}`;
+  return `Impossible de supprimer le fond avec RMBG. ${detail}`;
 }
 
 export function setBackgroundRemovalRunnerForTests(

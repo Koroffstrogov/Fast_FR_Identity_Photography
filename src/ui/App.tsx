@@ -28,6 +28,7 @@ import {
   PhotoItem,
   PhotoManualFacePointKind,
   BackgroundTechnicalDiagnostics,
+  OnnxSessionDiagnosticResult,
   PhotoUsage,
   addBackgroundPoint,
   clampCopies,
@@ -75,7 +76,11 @@ import {
   loadBackgroundRemovalModel,
   removeImageBackground,
 } from "../background/background-removal";
-import { createRmbg2ConfigForModelPath } from "../background/rmbg2-config";
+import {
+  createRmbg2ConfigForModelPath,
+  getRmbgEngineLabel,
+} from "../background/rmbg2-config";
+import { diagnoseOnnxSessionCreation } from "../ai/onnx-session-diagnostics";
 import { analyzeFaceLandmarks } from "../vision/face-landmarks";
 import {
   createFacePointsFromCandidate,
@@ -714,12 +719,13 @@ export function App() {
         ...currentPhoto,
         backgroundEdit: {
           ...(currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState()),
+          engine: diagnostics.engine,
           modelPath: backgroundEdit.modelPath,
           activeBackend: diagnostics.activeBackend,
           technicalDiagnostics: diagnostics,
           message:
             diagnostics.fallbackMessage ??
-            "Modele RMBG-2.0 charge localement. Aucune photo n'a ete envoyee.",
+            `Modele ${getRmbgEngineLabel(diagnostics.engine)} charge localement. Aucune photo n'a ete envoyee.`,
         },
       }));
       return null;
@@ -750,6 +756,53 @@ export function App() {
     void ensureBackgroundRemovalLoaded();
   }
 
+  async function handleDiagnoseBackgroundSession() {
+    const photo = activePhoto;
+
+    if (!photo) {
+      return;
+    }
+
+    const backgroundEdit = photo.backgroundEdit ?? getDefaultBackgroundEditState();
+    setBackgroundRemovalStatus("loading");
+    setBackgroundRemovalError("");
+
+    try {
+      const results = await diagnoseOnnxSessionCreation(backgroundEdit.modelPath);
+      const message = getOnnxSessionDiagnosticSummary(results);
+
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        backgroundEdit: {
+          ...(currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState()),
+          sessionDiagnostics: results,
+          message,
+        },
+      }));
+
+      setBackgroundRemovalStatus(results.some((result) => result.sessionCreated) ? "ready" : "error");
+      setBackgroundRemovalError(
+        results.some((result) => result.sessionCreated) ? "" : message,
+      );
+    } catch (diagnosticError) {
+      const message =
+        diagnosticError instanceof Error
+          ? diagnosticError.message
+          : "Impossible de diagnostiquer la creation de session ONNX.";
+
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        backgroundEdit: {
+          ...(currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState()),
+          sessionDiagnostics: [],
+          message,
+        },
+      }));
+      setBackgroundRemovalStatus("error");
+      setBackgroundRemovalError(message);
+    }
+  }
+
   async function handleRemoveBackground() {
     const photo = activePhoto;
 
@@ -767,7 +820,7 @@ export function App() {
       ...currentPhoto,
       backgroundEdit: {
         ...(currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState()),
-        message: "Suppression du fond RMBG-2.0 en cours.",
+        message: `Suppression du fond ${getRmbgEngineLabel(modelConfig.engine)} en cours.`,
       },
     }));
 
@@ -792,7 +845,7 @@ export function App() {
           ...currentPhoto,
           backgroundEdit: {
             ...backgroundEdit,
-            engine: "rmbg2",
+            engine: modelConfig.engine,
             enabled: true,
             activeBackend: result.diagnostics.activeBackend,
             mode: "replace",
@@ -831,6 +884,7 @@ export function App() {
   ) {
     if (
       partialEdit.backendPreference !== undefined ||
+      partialEdit.engine !== undefined ||
       partialEdit.modelPath !== undefined
     ) {
       setBackgroundRemovalStatus("idle");
@@ -842,19 +896,23 @@ export function App() {
       const modelChanged =
         partialEdit.modelPath !== undefined &&
         partialEdit.modelPath !== backgroundEdit.modelPath;
+      const engineChanged =
+        partialEdit.engine !== undefined &&
+        partialEdit.engine !== backgroundEdit.engine;
 
       return {
         ...photo,
         backgroundEdit: {
           ...backgroundEdit,
-          ...(modelChanged
+          ...(modelChanged || engineChanged
             ? {
                 enabled: false,
                 activeBackend: "none" as const,
                 rawMask: undefined,
                 technicalDiagnostics: undefined,
+                sessionDiagnostics: [],
                 maskVersion: backgroundEdit.maskVersion + 1,
-                message: "Modele RMBG change. Rechargez le modele avant inference.",
+                message: "Moteur ou modele RMBG change. Rechargez le modele avant inference.",
               }
             : {}),
           ...partialEdit,
@@ -1364,6 +1422,7 @@ export function App() {
           onApplyFacePlacementFromPoints={handleApplyFacePlacementFromPoints}
           onDeleteFacePoints={handleDeleteFacePoints}
           onLoadBackgroundModel={handleLoadBackgroundModel}
+          onDiagnoseBackgroundSession={handleDiagnoseBackgroundSession}
           onRemoveBackground={handleRemoveBackground}
           onBackgroundChange={handleBackgroundChange}
           onBackgroundPointModeChange={setBackgroundPointMode}
@@ -1514,4 +1573,25 @@ function hasBackgroundDiagnostics(
     "diagnostics" in error &&
     typeof (error as { diagnostics?: unknown }).diagnostics === "object"
   );
+}
+
+function getOnnxSessionDiagnosticSummary(
+  results: readonly OnnxSessionDiagnosticResult[],
+): string {
+  const successfulResults = results.filter((result) => result.sessionCreated);
+
+  if (successfulResults.length > 0) {
+    return `Diagnostic ONNX termine : ${successfulResults.length}/${results.length} variante(s) creent une session.`;
+  }
+
+  const firstError = results.find((result) => result.error)?.error;
+
+  return [
+    "Le modele est charge, mais aucune variante ONNX Runtime Web ne cree la session.",
+    "Le modele est valide ONNX cote Python, mais incompatible avec ONNX Runtime Web dans cette forme.",
+    firstError ? `Erreur representative : ${firstError}` : "",
+    "Pistes suivantes : tester un autre modele RMBG-1.4, tester model_quantized.onnx, tester model_uint8.onnx pour RMBG-2.0, convertir en format .ort, tester une autre version de onnxruntime-web ou un autre export ONNX compatible navigateur.",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }

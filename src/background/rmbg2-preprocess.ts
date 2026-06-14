@@ -17,7 +17,7 @@ export function preprocessImageDataForRmbg2(
 ): Rmbg2InputTensorData {
   if (imageData.width !== config.inputWidth || imageData.height !== config.inputHeight) {
     throw new Error(
-      `RMBG-2.0 attend une image ${config.inputWidth}x${config.inputHeight}, recu ${imageData.width}x${imageData.height}.`,
+      `RMBG attend une image ${config.inputWidth}x${config.inputHeight}, recu ${imageData.width}x${imageData.height}.`,
     );
   }
 
