@@ -51,8 +51,25 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   await expect(page.getByText("2 images importees.")).toBeVisible();
   await expect(page.getByText("2 photos / 30 places")).toBeVisible();
   await expect(canvas).toBeVisible();
+  const firstPhotoCard = page.locator(".photo-list-item").first();
+  const secondPhotoCard = page.locator(".photo-list-item").nth(1);
+  const expandedCardHeight = await firstPhotoCard.evaluate(
+    (node) => node.getBoundingClientRect().height,
+  );
+  const collapsedCardHeight = await secondPhotoCard.evaluate(
+    (node) => node.getBoundingClientRect().height,
+  );
+  expect(collapsedCardHeight).toBeLessThanOrEqual(88);
+  expect(expandedCardHeight).toBeGreaterThan(collapsedCardHeight);
   await expect(page.getByRole("button", { name: "Replier" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Ouvrir" })).toBeVisible();
+  await page.getByRole("button", { name: "Replier" }).click();
+  const manuallyCollapsedHeight = await firstPhotoCard.evaluate(
+    (node) => node.getBoundingClientRect().height,
+  );
+  expect(manuallyCollapsedHeight).toBeLessThan(expandedCardHeight);
+  expect(manuallyCollapsedHeight).toBeLessThanOrEqual(88);
+  await page.getByRole("button", { name: "Ouvrir" }).first().click();
 
   await page.getByRole("textbox", { name: "Prenom alice.png", exact: true }).fill("Alice");
   await page.getByRole("textbox", { name: "Nom alice.png", exact: true }).fill("Dupont");
@@ -63,7 +80,7 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   await page.getByRole("textbox", { name: "Prenom bob.png", exact: true }).fill("Éléa");
   await page.getByRole("textbox", { name: "Nom bob.png", exact: true }).fill("Sport");
   await page.getByLabel("Usage bob.png").selectOption("sport");
-  await page.getByRole("button", { name: "Generer nom affiche" }).nth(1).click();
+  await page.getByRole("button", { name: "Generer nom affiche" }).click();
 
   await page.getByRole("button", { name: "Export", exact: true }).click();
   await page.getByLabel("Modele de nommage").selectOption("lastFirstIdentity");
@@ -99,7 +116,7 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   await page.getByRole("button", { name: "Cadrer", exact: true }).click();
   await page.getByRole("button", { name: "Choisir bob.png" }).click();
   await expect(page.getByRole("heading", { name: "Éléa Sport" })).toBeVisible();
-  await expect(page.getByLabel("Afficher le guide visage")).toBeChecked();
+  await expect(page.getByLabel("Guide visage Renforce")).toBeChecked();
   await expect(
     page.getByRole("button", { name: "Placer les points automatiquement" }),
   ).toBeVisible();
@@ -113,8 +130,8 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
     (node as HTMLCanvasElement).toDataURL("image/jpeg"),
   );
 
-  await page.getByLabel("Afficher le guide visage").uncheck();
-  await expect(page.getByLabel("Afficher le guide visage")).not.toBeChecked();
+  await page.locator('label:has(input[name="face-guide-level"][value="hidden"])').click();
+  await expect(page.getByLabel("Guide visage Masque")).toBeChecked();
   expect(
     await canvas.evaluate((node) => (node as HTMLCanvasElement).toDataURL("image/jpeg")),
   ).toBe(photoDataBeforeGuideToggle);
@@ -125,13 +142,13 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   ).toBe(sheetDataBeforeGuideToggle);
 
   await page.getByRole("button", { name: "Cadrer", exact: true }).click();
-  await page.getByLabel("Afficher le guide visage").check();
-  await page.getByRole("slider", { name: "Opacite du guide" }).evaluate((input) => {
-    const range = input as HTMLInputElement;
-    range.value = "0.35";
-    range.dispatchEvent(new Event("input", { bubbles: true }));
-    range.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  await page.locator('label:has(input[name="face-guide-level"][value="subtle"])').click();
+  await expect(page.getByLabel("Guide visage Discret")).toBeChecked();
+  expect(
+    await canvas.evaluate((node) => (node as HTMLCanvasElement).toDataURL("image/jpeg")),
+  ).toBe(photoDataBeforeGuideToggle);
+  await page.locator('label:has(input[name="face-guide-level"][value="strong"])').click();
+  await expect(page.getByLabel("Guide visage Renforce")).toBeChecked();
   expect(
     await canvas.evaluate((node) => (node as HTMLCanvasElement).toDataURL("image/jpeg")),
   ).toBe(photoDataBeforeGuideToggle);

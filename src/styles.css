@@ -505,6 +505,15 @@ h2 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.guide-level-options {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.guide-level-options span {
+  min-height: 38px;
+  text-align: center;
+}
+
 .background-mode-options span {
   min-height: 42px;
   text-align: center;
@@ -1086,47 +1095,66 @@ button {
 .photo-list {
   min-height: 0;
   overflow-y: auto;
+  align-content: start;
+  align-items: start;
   padding-right: 2px;
 }
 
 .photo-list-item {
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-  padding: 9px;
+  gap: 0;
+  padding: 7px;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.photo-list-item:hover {
+  border-color: #9fb2b4;
+  background: #ffffff;
 }
 
 .photo-list-summary {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: 44px minmax(0, 1fr) 58px;
-  gap: 6px;
+  grid-template-columns: 46px minmax(0, 1fr) 78px;
+  grid-template-rows: auto auto;
+  gap: 4px 8px;
   align-items: center;
   min-width: 0;
 }
 
 .photo-list-summary .photo-thumbnail {
+  grid-column: 1;
   grid-row: 1 / span 2;
-  width: 42px;
-  height: 54px;
+  align-self: center;
+  width: 46px;
+  height: 60px;
 }
 
 .photo-list-summary .photo-select-button {
-  min-height: 32px;
-  padding: 4px 6px;
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 34px;
+  padding: 2px 4px;
+  align-self: end;
 }
 
 .photo-list-summary .photo-select-button span {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   font-size: 0.78rem;
 }
 
 .photo-list-summary .photo-select-button strong {
-  font-size: 0.86rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.15;
 }
 
 .photo-list-summary .photo-select-button small {
-  font-size: 0.74rem;
+  font-size: 0.78rem;
+  line-height: 1.15;
 }
 
 .photo-list-summary .compact-control,
@@ -1135,32 +1163,42 @@ button {
 }
 
 .photo-list-summary .copies-control {
+  display: grid;
   grid-column: 3;
   grid-row: 1;
-  gap: 2px;
-  font-size: 0.68rem;
+  grid-template-columns: auto 34px;
+  gap: 4px;
+  align-self: end;
+  align-items: center;
+  font-size: 0.78rem;
+  line-height: 1;
 }
 
 .photo-list-summary .copies-control input {
   min-height: 30px;
-  padding: 3px 5px;
+  padding: 3px 4px;
+  font-size: 0.82rem;
 }
 
 .photo-toggle-button,
 .photo-list-summary .remove-button {
   min-height: 30px;
-  padding: 0 6px;
-  font-size: 0.74rem;
+  padding: 0 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .photo-toggle-button {
   grid-column: 2;
   grid-row: 2;
+  justify-self: start;
+  align-self: start;
 }
 
 .photo-list-summary .remove-button {
   grid-column: 3;
   grid-row: 2;
+  align-self: start;
 }
 
 .photo-list-details {
@@ -1168,8 +1206,19 @@ button {
   grid-column: 1 / -1;
   gap: 8px;
   min-width: 0;
+  margin-top: 8px;
   border-top: 1px solid #d8e1de;
   padding-top: 8px;
+}
+
+.photo-list-details .compact-control {
+  font-size: 0.82rem;
+}
+
+.photo-list-details .compact-control input,
+.photo-list-details .compact-control select {
+  min-height: 34px;
+  padding: 6px 8px;
 }
 
 .photo-list-panel h2 {

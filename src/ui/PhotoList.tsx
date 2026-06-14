@@ -38,38 +38,20 @@ export function PhotoList({
   onCopiesChange,
   onRemovePhoto,
 }: PhotoListProps) {
-  const [expandedPhotoIds, setExpandedPhotoIds] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const [expandedPhotoId, setExpandedPhotoId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!activePhotoId) {
       return;
     }
 
-    setExpandedPhotoIds((currentIds) => {
-      if (currentIds.has(activePhotoId)) {
-        return currentIds;
-      }
-
-      const nextIds = new Set(currentIds);
-      nextIds.add(activePhotoId);
-      return nextIds;
-    });
+    setExpandedPhotoId(activePhotoId);
   }, [activePhotoId]);
 
   function toggleExpanded(photoId: string) {
-    setExpandedPhotoIds((currentIds) => {
-      const nextIds = new Set(currentIds);
-
-      if (nextIds.has(photoId)) {
-        nextIds.delete(photoId);
-      } else {
-        nextIds.add(photoId);
-      }
-
-      return nextIds;
-    });
+    setExpandedPhotoId((currentPhotoId) =>
+      currentPhotoId === photoId ? null : photoId,
+    );
   }
 
   return (
@@ -81,7 +63,7 @@ export function PhotoList({
         <ol className="photo-list">
           {photos.map((photo, index) => {
             const isActive = photo.id === activePhotoId;
-            const isExpanded = expandedPhotoIds.has(photo.id);
+            const isExpanded = expandedPhotoId === photo.id;
 
             return (
               <li
@@ -139,7 +121,7 @@ export function PhotoList({
                     onClick={() => onRemovePhoto(photo.id)}
                     aria-label={`Supprimer ${photo.originalFileName}`}
                   >
-                    Supprimer
+                    Suppr.
                   </button>
                 </div>
 

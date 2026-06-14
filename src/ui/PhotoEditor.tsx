@@ -6,6 +6,7 @@ import { BackgroundRemovalStatus } from "../background/background-removal";
 import type { FaceLandmarkerModelStatus } from "../vision/face-landmarker";
 import { BackgroundPanel, BackgroundPointMode } from "./BackgroundPanel";
 import { FaceDetectionPanel } from "./FaceDetectionPanel";
+import { FaceGuideControl } from "./FaceGuideControl";
 
 type PhotoEditorProps = {
   photo: PhotoItem | null;
@@ -124,36 +125,11 @@ export function PhotoEditor({
           />
         </label>
 
-        <fieldset className="guide-control">
-          <legend>Guide visage</legend>
-          <label className="check-control">
-            <input
-              type="checkbox"
-              checked={editState?.showFaceGuide ?? true}
-              onChange={(event) => onGuideVisibilityChange(event.currentTarget.checked)}
-              disabled={!photo}
-            />
-            <span>Afficher le guide visage</span>
-          </label>
-          <label className="slider-control">
-            <span>Opacite du guide</span>
-            <output>{Math.round((editState?.faceGuideOpacity ?? 0.82) * 100)}%</output>
-            <input
-              aria-label="Opacite du guide"
-              type="range"
-              min="0.15"
-              max="1"
-              step="0.01"
-              value={editState?.faceGuideOpacity ?? 0.82}
-              onChange={(event) => onGuideOpacityChange(Number(event.currentTarget.value))}
-              disabled={!photo || !editState?.showFaceGuide}
-            />
-          </label>
-          <p className="guide-note">
-            Gabarit base sur les recommandations francaises : visage 32-36 mm
-            du menton au sommet du crane, hors cheveux.
-          </p>
-        </fieldset>
+        <FaceGuideControl
+          photo={photo}
+          onGuideVisibilityChange={onGuideVisibilityChange}
+          onGuideOpacityChange={onGuideOpacityChange}
+        />
 
         <FaceDetectionPanel
           photo={photo}
