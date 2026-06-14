@@ -9,6 +9,7 @@ import {
   degreesToRadians,
   getCoverScale,
 } from "../core/geometry";
+import { createPostProcessedMaskCacheKey } from "../background/background-cache";
 import { createRefinedAlphaMask } from "../vision/mask-refinement";
 
 export type BackgroundRenderOutput = "preview" | "export";
@@ -241,17 +242,7 @@ function getSourceMaskCanvasCacheKey(
   imageSize: Size,
   backgroundEdit: BackgroundEditState,
 ): string {
-  return JSON.stringify({
-    imageWidth: imageSize.width,
-    imageHeight: imageSize.height,
-    threshold: backgroundEdit.threshold,
-    featherPx: backgroundEdit.featherPx,
-    edgeSmoothingPx: backgroundEdit.edgeSmoothingPx,
-    preserveHair: backgroundEdit.preserveHair,
-    maskVersion: backgroundEdit.maskVersion,
-    foregroundPoints: backgroundEdit.manualForegroundPoints,
-    backgroundPoints: backgroundEdit.manualBackgroundPoints,
-  });
+  return createPostProcessedMaskCacheKey(backgroundEdit, imageSize);
 }
 
 function createSourceMaskCanvas(

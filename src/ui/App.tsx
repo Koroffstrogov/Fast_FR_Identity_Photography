@@ -73,6 +73,12 @@ import {
   getFaceLandmarkerErrorMessage,
   loadFaceLandmarker,
 } from "../vision/face-landmarker";
+import {
+  BackgroundRemovalStatus,
+  getBackgroundRemovalErrorMessage,
+  loadBackgroundRemovalModel,
+  removeImageBackground,
+} from "../background/background-removal";
 import { analyzeFaceLandmarks } from "../vision/face-landmarks";
 import {
   createFacePointsFromCandidate,
@@ -83,13 +89,6 @@ import {
   createFacePlacementFromFacePoints,
   sourceImagePointToCanvasPoint,
 } from "../vision/face-placement";
-import {
-  BackgroundSegmenterStatus,
-  getBackgroundSegmenterErrorMessage,
-  loadBackgroundSegmenter,
-  segmentImageBackground,
-} from "../vision/background-segmenter";
-
 type DragState = {
   kind: "photo";
   pointerId: number;
@@ -122,9 +121,9 @@ export function App() {
   const [faceModelStatus, setFaceModelStatus] =
     useState<FaceLandmarkerModelStatus>("idle");
   const [faceModelError, setFaceModelError] = useState("");
-  const [backgroundSegmenterStatus, setBackgroundSegmenterStatus] =
-    useState<BackgroundSegmenterStatus>("idle");
-  const [backgroundSegmenterError, setBackgroundSegmenterError] = useState("");
+  const [backgroundRemovalStatus, setBackgroundRemovalStatus] =
+    useState<BackgroundRemovalStatus>("idle");
+  const [backgroundRemovalError, setBackgroundRemovalError] = useState("");
   const [backgroundPointMode, setBackgroundPointMode] =
     useState<BackgroundPointMode>("none");
   const sheetCapacity = useMemo(() => getSheetCapacity(sheetMode), [sheetMode]);
@@ -690,68 +689,86 @@ export function App() {
     }));
   }
 
-  async function ensureBackgroundSegmenterLoaded(): Promise<string | null> {
-    if (backgroundSegmenterStatus === "ready") {
-      return null;
+  async function ensureBackgroundRemovalLoaded(): Promise<string | null> {
+    const photo = activePhoto;
+
+    if (!photo) {
+      return "Importez une photo avant de charger le modele de fond.";
     }
 
-    setBackgroundSegmenterStatus("loading");
-    setBackgroundSegmenterError("");
+    const backgroundEdit = photo.backgroundEdit ?? getDefaultBackgroundEditState();
+
+    setBackgroundRemovalStatus("loading");
+    setBackgroundRemovalError("");
 
     try {
-      await loadBackgroundSegmenter();
-      setBackgroundSegmenterStatus("ready");
+      const diagnostics = await loadBackgroundRemovalModel(
+        backgroundEdit.backendPreference,
+      );
+      setBackgroundRemovalStatus("ready");
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        backgroundEdit: {
+          ...(currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState()),
+          activeBackend: diagnostics.activeBackend,
+          technicalDiagnostics: diagnostics,
+          message:
+            diagnostics.fallbackMessage ??
+            "Modele RMBG-2.0 charge localement. Aucune photo n'a ete envoyee.",
+        },
+      }));
       return null;
     } catch (loadError) {
       const message =
         loadError instanceof Error
           ? loadError.message
-          : getBackgroundSegmenterErrorMessage(loadError);
-      setBackgroundSegmenterStatus("error");
-      setBackgroundSegmenterError(message);
+          : getBackgroundRemovalErrorMessage(loadError);
+      setBackgroundRemovalStatus("error");
+      setBackgroundRemovalError(message);
+
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        backgroundEdit: {
+          ...(currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState()),
+          message,
+        },
+      }));
 
       return message;
     }
   }
 
-  function handleLoadBackgroundSegmenter() {
-    void ensureBackgroundSegmenterLoaded();
+  function handleLoadBackgroundModel() {
+    void ensureBackgroundRemovalLoaded();
   }
 
-  async function handleSegmentBackground() {
+  async function handleRemoveBackground() {
     const photo = activePhoto;
 
     if (!photo) {
       return;
     }
 
+    const backendPreference =
+      photo.backgroundEdit?.backendPreference ??
+      getDefaultBackgroundEditState().backendPreference;
+
     updatePhoto(photo.id, (currentPhoto) => ({
       ...currentPhoto,
       backgroundEdit: {
         ...(currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState()),
-        message: "Detection du fond en cours.",
+        message: "Suppression du fond RMBG-2.0 en cours.",
       },
     }));
 
-    const modelErrorMessage = await ensureBackgroundSegmenterLoaded();
+    const modelErrorMessage = await ensureBackgroundRemovalLoaded();
 
     if (modelErrorMessage) {
-      updatePhoto(photo.id, (currentPhoto) => ({
-        ...currentPhoto,
-        backgroundEdit: {
-          ...(currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState()),
-          message: modelErrorMessage,
-        },
-      }));
       return;
     }
 
     try {
-      const segmentation = await segmentImageBackground(photo.image);
-      const diagnosticsText =
-        segmentation.diagnostics.length > 0
-          ? ` ${segmentation.diagnostics.join(" ")}`
-          : "";
+      const result = await removeImageBackground(photo.image, backendPreference);
 
       updatePhoto(photo.id, (currentPhoto) => {
         const backgroundEdit =
@@ -761,22 +778,27 @@ export function App() {
           ...currentPhoto,
           backgroundEdit: {
             ...backgroundEdit,
+            engine: "rmbg2",
             enabled: true,
+            activeBackend: result.diagnostics.activeBackend,
             mode: "replace",
-            rawMask: segmentation.mask,
+            rawMask: result.mask,
+            technicalDiagnostics: result.diagnostics,
             maskVersion: backgroundEdit.maskVersion + 1,
-            message:
-              `Fond detecte automatiquement. Verifiez les cheveux et les contours.${diagnosticsText}`,
+            message: result.messages.join(" "),
           },
         };
       });
-      setBackgroundSegmenterError("");
-    } catch (segmentError) {
+      setBackgroundRemovalStatus("ready");
+      setBackgroundRemovalError("");
+    } catch (removeError) {
       const message =
-        segmentError instanceof Error
-          ? segmentError.message
+        removeError instanceof Error
+          ? removeError.message
           : "Impossible de supprimer le fond sur la photo active.";
 
+      setBackgroundRemovalStatus("error");
+      setBackgroundRemovalError(message);
       updatePhoto(photo.id, (currentPhoto) => ({
         ...currentPhoto,
         backgroundEdit: {
@@ -790,6 +812,11 @@ export function App() {
   function handleBackgroundChange(
     partialEdit: Partial<NonNullable<PhotoItem["backgroundEdit"]>>,
   ) {
+    if (partialEdit.backendPreference !== undefined) {
+      setBackgroundRemovalStatus("idle");
+      setBackgroundRemovalError("");
+    }
+
     updateActivePhoto((photo) => ({
       ...photo,
       backgroundEdit: {
@@ -811,6 +838,29 @@ export function App() {
           manualBackgroundPoints: [],
           maskVersion: backgroundEdit.maskVersion + 1,
           message: "Points de correction effaces.",
+        },
+      };
+    });
+  }
+
+  function handleResetBackgroundSettings() {
+    updateActivePhoto((photo) => {
+      const backgroundEdit = photo.backgroundEdit ?? getDefaultBackgroundEditState();
+      const defaults = getDefaultBackgroundEditState();
+
+      return {
+        ...photo,
+        backgroundEdit: {
+          ...backgroundEdit,
+          replacementColor: defaults.replacementColor,
+          threshold: defaults.threshold,
+          featherPx: defaults.featherPx,
+          edgeSmoothingPx: defaults.edgeSmoothingPx,
+          preserveHair: defaults.preserveHair,
+          manualForegroundPoints: [],
+          manualBackgroundPoints: [],
+          maskVersion: backgroundEdit.maskVersion + 1,
+          message: "Reglages fond reinitialises sans relancer l'inference.",
         },
       };
     });
@@ -1264,8 +1314,8 @@ export function App() {
           composition={sheetComposition}
           faceModelStatus={faceModelStatus}
           faceModelError={faceModelError}
-          backgroundSegmenterStatus={backgroundSegmenterStatus}
-          backgroundSegmenterError={backgroundSegmenterError}
+          backgroundRemovalStatus={backgroundRemovalStatus}
+          backgroundRemovalError={backgroundRemovalError}
           backgroundPointMode={backgroundPointMode}
           onGuideVisibilityChange={handleGuideVisibilityChange}
           onGuideOpacityChange={handleGuideOpacityChange}
@@ -1276,11 +1326,12 @@ export function App() {
           onFacePointsVisibilityChange={handleFacePointsVisibilityChange}
           onApplyFacePlacementFromPoints={handleApplyFacePlacementFromPoints}
           onDeleteFacePoints={handleDeleteFacePoints}
-          onLoadBackgroundSegmenter={handleLoadBackgroundSegmenter}
-          onSegmentBackground={handleSegmentBackground}
+          onLoadBackgroundModel={handleLoadBackgroundModel}
+          onRemoveBackground={handleRemoveBackground}
           onBackgroundChange={handleBackgroundChange}
           onBackgroundPointModeChange={setBackgroundPointMode}
           onResetBackgroundPoints={handleResetBackgroundPoints}
+          onResetBackgroundSettings={handleResetBackgroundSettings}
           onQualityChange={handleQualityChange}
           onAutoQuality={handleAutoQuality}
           onResetQuality={handleResetQuality}

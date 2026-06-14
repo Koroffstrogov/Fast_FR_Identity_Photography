@@ -7,3 +7,4 @@ playwright-report/
 *.local
 public/models/mediapipe/*.task
 public/models/mediapipe/*.tflite
+public/models/rmbg2/*.onnx

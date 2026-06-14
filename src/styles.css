@@ -515,6 +515,57 @@ h2 {
   gap: 8px;
 }
 
+.background-diagnostics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.background-diagnostics div {
+  min-width: 0;
+  border: 1px solid #edf2f0;
+  border-radius: 8px;
+  padding: 8px;
+  background: #fbfcfc;
+}
+
+.background-diagnostics dt {
+  color: #637179;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.background-diagnostics dd {
+  margin: 4px 0 0;
+  color: #172026;
+  font-size: 0.86rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.technical-details {
+  border: 1px solid #edf2f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fbfcfc;
+  color: #4e5a60;
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.technical-details summary {
+  color: #253137;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.technical-details p {
+  margin: 8px 0 0;
+  overflow-wrap: anywhere;
+}
+
 .active-tool-button {
   color: #ffffff;
   background: #7b3f2a;

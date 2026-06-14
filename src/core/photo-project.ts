@@ -14,6 +14,12 @@ export type PhotoUsage = "college" | "sport" | "badge" | "autre";
 
 export type BackgroundPreviewMode = "original" | "replace" | "mask-preview";
 
+export type BackgroundRemovalEngine = "rmbg2" | "legacy";
+
+export type BackgroundRemovalBackendPreference = "auto" | "gpu" | "cpu";
+
+export type BackgroundRemovalActiveBackend = "webgpu" | "wasm" | "none";
+
 export type BackgroundPoint = {
   x: number;
   y: number;
@@ -24,11 +30,34 @@ export type BackgroundMaskData = {
   height: number;
   data: Float32Array;
   labels: string[];
-  source: "confidence" | "category";
+  source: "confidence" | "category" | "rmbg2";
+};
+
+export type BackgroundTechnicalDiagnostics = {
+  navigatorGpuAvailable: boolean;
+  requestedBackend: BackgroundRemovalBackendPreference;
+  activeBackend: BackgroundRemovalActiveBackend;
+  provider: string;
+  modelPath: string;
+  ortWasmPath: string;
+  inputWidth: number;
+  inputHeight: number;
+  maskWidth?: number;
+  maskHeight?: number;
+  inputNames: string[];
+  outputNames: string[];
+  selectedInputName?: string;
+  selectedOutputName?: string;
+  sessionCreationMs?: number;
+  inferenceMs?: number;
+  fallbackMessage?: string;
 };
 
 export type BackgroundEditState = {
+  engine: BackgroundRemovalEngine;
   enabled: boolean;
+  backendPreference: BackgroundRemovalBackendPreference;
+  activeBackend: BackgroundRemovalActiveBackend;
   replacementColor: string;
   mode: BackgroundPreviewMode;
   threshold: number;
@@ -39,6 +68,7 @@ export type BackgroundEditState = {
   manualBackgroundPoints: BackgroundPoint[];
   maskVersion: number;
   rawMask?: BackgroundMaskData;
+  technicalDiagnostics?: BackgroundTechnicalDiagnostics;
   message: string;
 };
 
@@ -124,7 +154,10 @@ export function getDefaultPhotoFaceDetectionState(): PhotoFaceDetectionState {
 
 export function getDefaultBackgroundEditState(): BackgroundEditState {
   return {
+    engine: "rmbg2",
     enabled: false,
+    backendPreference: "auto",
+    activeBackend: "none",
     replacementColor: DEFAULT_BACKGROUND_REPLACEMENT_COLOR,
     mode: "original",
     threshold: 0.5,
@@ -135,6 +168,7 @@ export function getDefaultBackgroundEditState(): BackgroundEditState {
     manualBackgroundPoints: [],
     maskVersion: 0,
     rawMask: undefined,
+    technicalDiagnostics: undefined,
     message: "",
   };
 }

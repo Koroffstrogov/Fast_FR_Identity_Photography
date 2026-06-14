@@ -3,7 +3,7 @@ import { PhotoItem } from "../core/photo-project";
 import { PRINT_LAYOUTS, PrintLayoutMode } from "../core/print-layout";
 import { SheetComposition } from "../core/sheet-items";
 import { QualityEditState } from "../quality/quality-state";
-import { BackgroundSegmenterStatus } from "../vision/background-segmenter";
+import { BackgroundRemovalStatus } from "../background/background-removal";
 import { FaceLandmarkerModelStatus } from "../vision/face-landmarker";
 import { BackgroundPanel, BackgroundPointMode } from "./BackgroundPanel";
 import { ExportPanel } from "./ExportPanel";
@@ -20,8 +20,8 @@ type RightInspectorProps = {
   composition: SheetComposition;
   faceModelStatus: FaceLandmarkerModelStatus;
   faceModelError: string;
-  backgroundSegmenterStatus: BackgroundSegmenterStatus;
-  backgroundSegmenterError: string;
+  backgroundRemovalStatus: BackgroundRemovalStatus;
+  backgroundRemovalError: string;
   backgroundPointMode: BackgroundPointMode;
   onGuideVisibilityChange: (showGuide: boolean) => void;
   onGuideOpacityChange: (opacity: number) => void;
@@ -32,11 +32,12 @@ type RightInspectorProps = {
   onFacePointsVisibilityChange: (showFacePoints: boolean) => void;
   onApplyFacePlacementFromPoints: () => void;
   onDeleteFacePoints: () => void;
-  onLoadBackgroundSegmenter: () => void;
-  onSegmentBackground: () => void;
+  onLoadBackgroundModel: () => void;
+  onRemoveBackground: () => void;
   onBackgroundChange: (partialEdit: Partial<NonNullable<PhotoItem["backgroundEdit"]>>) => void;
   onBackgroundPointModeChange: (mode: BackgroundPointMode) => void;
   onResetBackgroundPoints: () => void;
+  onResetBackgroundSettings: () => void;
   onQualityChange: (partialEdit: Partial<QualityEditState>) => void;
   onAutoQuality: () => void;
   onResetQuality: () => void;
@@ -59,8 +60,8 @@ export function RightInspector({
   composition,
   faceModelStatus,
   faceModelError,
-  backgroundSegmenterStatus,
-  backgroundSegmenterError,
+  backgroundRemovalStatus,
+  backgroundRemovalError,
   backgroundPointMode,
   onGuideVisibilityChange,
   onGuideOpacityChange,
@@ -71,11 +72,12 @@ export function RightInspector({
   onFacePointsVisibilityChange,
   onApplyFacePlacementFromPoints,
   onDeleteFacePoints,
-  onLoadBackgroundSegmenter,
-  onSegmentBackground,
+  onLoadBackgroundModel,
+  onRemoveBackground,
   onBackgroundChange,
   onBackgroundPointModeChange,
   onResetBackgroundPoints,
+  onResetBackgroundSettings,
   onQualityChange,
   onAutoQuality,
   onResetQuality,
@@ -121,14 +123,15 @@ export function RightInspector({
         <BackgroundPanel
           backgroundEdit={photo?.backgroundEdit}
           disabled={!photo}
-          segmenterStatus={backgroundSegmenterStatus}
-          segmenterError={backgroundSegmenterError}
+          removalStatus={backgroundRemovalStatus}
+          removalError={backgroundRemovalError}
           pointMode={backgroundPointMode}
-          onLoadSegmenter={onLoadBackgroundSegmenter}
-          onSegmentBackground={onSegmentBackground}
+          onLoadModel={onLoadBackgroundModel}
+          onRemoveBackground={onRemoveBackground}
           onBackgroundChange={onBackgroundChange}
           onPointModeChange={onBackgroundPointModeChange}
           onResetPoints={onResetBackgroundPoints}
+          onResetSettings={onResetBackgroundSettings}
         />
       )}
 

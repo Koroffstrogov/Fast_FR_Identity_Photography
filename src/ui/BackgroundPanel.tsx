@@ -1,68 +1,123 @@
 import {
   BackgroundEditState,
+  BackgroundRemovalBackendPreference,
   BackgroundPreviewMode,
-  DEFAULT_BACKGROUND_REPLACEMENT_COLOR,
+  getDefaultBackgroundEditState,
 } from "../core/photo-project";
-import { BackgroundSegmenterStatus } from "../vision/background-segmenter";
+import { getRuntimeCapabilities } from "../ai/runtime-capabilities";
+import { BackgroundRemovalStatus } from "../background/background-removal";
+import { RMBG2_ENGINE_LABEL } from "../background/rmbg2-config";
 
 export type BackgroundPointMode = "none" | "foreground" | "background";
 
 type BackgroundPanelProps = {
   backgroundEdit: BackgroundEditState | undefined;
   disabled: boolean;
-  segmenterStatus: BackgroundSegmenterStatus;
-  segmenterError: string;
+  removalStatus: BackgroundRemovalStatus;
+  removalError: string;
   pointMode: BackgroundPointMode;
-  onLoadSegmenter: () => void;
-  onSegmentBackground: () => void;
+  onLoadModel: () => void;
+  onRemoveBackground: () => void;
   onBackgroundChange: (partialEdit: Partial<BackgroundEditState>) => void;
   onPointModeChange: (mode: BackgroundPointMode) => void;
   onResetPoints: () => void;
+  onResetSettings: () => void;
 };
 
 export function BackgroundPanel({
   backgroundEdit,
   disabled,
-  segmenterStatus,
-  segmenterError,
+  removalStatus,
+  removalError,
   pointMode,
-  onLoadSegmenter,
-  onSegmentBackground,
+  onLoadModel,
+  onRemoveBackground,
   onBackgroundChange,
   onPointModeChange,
   onResetPoints,
+  onResetSettings,
 }: BackgroundPanelProps) {
   const edit = backgroundEdit ?? getFallbackBackgroundEditState();
-  const isBusy = segmenterStatus === "loading";
+  const isBusy = removalStatus === "loading";
   const pointCount =
     edit.manualForegroundPoints.length + edit.manualBackgroundPoints.length;
+  const diagnostics = edit.technicalDiagnostics;
+  const navigatorGpuAvailable =
+    diagnostics?.navigatorGpuAvailable ?? getRuntimeCapabilities().navigatorGpuAvailable;
 
   return (
     <fieldset className="background-panel">
       <legend>Fond</legend>
 
-      <p className="model-status">Modele : {getSegmenterStatusLabel(segmenterStatus)}</p>
+      <p className="model-status">Moteur : {RMBG2_ENGINE_LABEL}</p>
+      <p className="model-status">Modele : {getRemovalStatusLabel(removalStatus)}</p>
 
-      {segmenterStatus !== "ready" && (
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={onLoadSegmenter}
+      <label className="select-control">
+        <span>Backend fond</span>
+        <select
+          aria-label="Backend fond"
+          value={edit.backendPreference}
+          onChange={(event) =>
+            onBackgroundChange({
+              backendPreference: event.currentTarget
+                .value as BackgroundRemovalBackendPreference,
+              activeBackend: "none",
+            })
+          }
           disabled={disabled || isBusy}
         >
-          Charger le modele fond
-        </button>
-      )}
+          <option value="auto">Auto GPU puis CPU</option>
+          <option value="gpu">GPU WebGPU</option>
+          <option value="cpu">CPU WASM</option>
+        </select>
+      </label>
 
       <button
         type="button"
-        onClick={onSegmentBackground}
+        className="secondary-button"
+        onClick={onLoadModel}
+        disabled={disabled || isBusy}
+      >
+        Charger / verifier le modele
+      </button>
+
+      <button
+        type="button"
+        onClick={onRemoveBackground}
         disabled={disabled || isBusy}
       >
         Supprimer le fond
       </button>
 
-      {segmenterError && <p className="warning">{segmenterError}</p>}
+      <button
+        type="button"
+        className="secondary-button"
+        onClick={onRemoveBackground}
+        disabled={disabled || isBusy}
+      >
+        Reappliquer
+      </button>
+
+      <div className="button-row">
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={onResetSettings}
+          disabled={disabled}
+        >
+          Reinitialiser les reglages fond
+        </button>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => onBackgroundChange({ enabled: false, mode: "original" })}
+          disabled={disabled}
+        >
+          Desactiver le remplacement du fond
+        </button>
+      </div>
+
+      {removalError && <p className="warning">{removalError}</p>}
       {edit.message && <p className="detection-message">{edit.message}</p>}
 
       <label className="check-control">
@@ -84,7 +139,7 @@ export function BackgroundPanel({
         <legend>Apercu fond</legend>
         <div className="segmented-options background-mode-options">
           {renderModeOption("original", "Original", edit.mode, disabled, onBackgroundChange)}
-          {renderModeOption("replace", "Remplace", edit.mode, disabled, onBackgroundChange)}
+          {renderModeOption("replace", "Fond remplace", edit.mode, disabled, onBackgroundChange)}
           {renderModeOption("mask-preview", "Masque", edit.mode, disabled, onBackgroundChange)}
         </div>
       </fieldset>
@@ -181,6 +236,52 @@ export function BackgroundPanel({
         <span>Conserver les cheveux fins</span>
       </label>
 
+      <dl className="background-diagnostics" aria-label="Diagnostics techniques fond">
+        <div>
+          <dt>WebGPU</dt>
+          <dd>{navigatorGpuAvailable ? "oui" : "non"}</dd>
+        </div>
+        <div>
+          <dt>Backend demande</dt>
+          <dd>{getBackendPreferenceLabel(edit.backendPreference)}</dd>
+        </div>
+        <div>
+          <dt>Backend actif</dt>
+          <dd>{getActiveBackendLabel(edit.activeBackend)}</dd>
+        </div>
+        <div>
+          <dt>Provider ONNX</dt>
+          <dd>{diagnostics?.provider ?? "-"}</dd>
+        </div>
+        <div>
+          <dt>Session</dt>
+          <dd>{formatMs(diagnostics?.sessionCreationMs)}</dd>
+        </div>
+        <div>
+          <dt>Inference</dt>
+          <dd>{formatMs(diagnostics?.inferenceMs)}</dd>
+        </div>
+        <div>
+          <dt>Entree modele</dt>
+          <dd>{diagnostics ? `${diagnostics.inputWidth}x${diagnostics.inputHeight}` : "1024x1024"}</dd>
+        </div>
+        <div>
+          <dt>Masque sortie</dt>
+          <dd>{diagnostics?.maskWidth && diagnostics.maskHeight ? `${diagnostics.maskWidth}x${diagnostics.maskHeight}` : "-"}</dd>
+        </div>
+      </dl>
+
+      <details className="technical-details">
+        <summary>Details ONNX</summary>
+        <p>Input detecte : {diagnostics?.selectedInputName ?? diagnostics?.inputNames.join(", ") ?? "-"}</p>
+        <p>Output detecte : {diagnostics?.selectedOutputName ?? diagnostics?.outputNames.join(", ") ?? "-"}</p>
+        <p>Assets WASM : {diagnostics?.ortWasmPath ?? "/ort/"}</p>
+        <p>Modele : {diagnostics?.modelPath ?? "/models/rmbg2/model.onnx"}</p>
+        {diagnostics?.fallbackMessage && (
+          <p className="warning">{diagnostics.fallbackMessage}</p>
+        )}
+      </details>
+
       <div className="background-point-controls">
         <button
           type="button"
@@ -243,23 +344,10 @@ function renderModeOption(
 }
 
 function getFallbackBackgroundEditState(): BackgroundEditState {
-  return {
-    enabled: false,
-    replacementColor: DEFAULT_BACKGROUND_REPLACEMENT_COLOR,
-    mode: "original",
-    threshold: 0.5,
-    featherPx: 6,
-    edgeSmoothingPx: 2,
-    preserveHair: true,
-    manualForegroundPoints: [],
-    manualBackgroundPoints: [],
-    maskVersion: 0,
-    rawMask: undefined,
-    message: "",
-  };
+  return getDefaultBackgroundEditState();
 }
 
-function getSegmenterStatusLabel(status: BackgroundSegmenterStatus): string {
+function getRemovalStatusLabel(status: BackgroundRemovalStatus): string {
   switch (status) {
     case "idle":
       return "non charge";
@@ -270,4 +358,32 @@ function getSegmenterStatusLabel(status: BackgroundSegmenterStatus): string {
     case "error":
       return "erreur";
   }
+}
+
+function getBackendPreferenceLabel(
+  backendPreference: BackgroundRemovalBackendPreference,
+): string {
+  switch (backendPreference) {
+    case "auto":
+      return "Auto";
+    case "gpu":
+      return "GPU";
+    case "cpu":
+      return "CPU";
+  }
+}
+
+function getActiveBackendLabel(activeBackend: BackgroundEditState["activeBackend"]): string {
+  switch (activeBackend) {
+    case "webgpu":
+      return "WebGPU";
+    case "wasm":
+      return "CPU/WASM";
+    case "none":
+      return "-";
+  }
+}
+
+function formatMs(value: number | undefined): string {
+  return typeof value === "number" ? `${value} ms` : "-";
 }

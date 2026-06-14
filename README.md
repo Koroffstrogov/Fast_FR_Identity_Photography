@@ -54,31 +54,54 @@ Limites connues du diagnostic qualite :
 
 ## Suppression locale du fond
 
-La suppression du fond utilise MediaPipe Image Segmenter dans le navigateur,
-avec un modele personne/fond charge depuis `public/models`. Aucune photo n'est
-envoyee a un serveur et l'image originale reste intacte : le masque, la couleur
-de remplacement et les points de correction sont stockes dans l'etat d'edition
-de chaque photo.
+Le moteur principal cible est BRIA RMBG-2.0 via `onnxruntime-web/webgpu`.
+L'inference se fait dans le navigateur, depuis un modele ONNX local. Aucune
+photo n'est envoyee a un serveur et l'image originale reste intacte : le masque
+brut, les reglages de post-traitement et la couleur de fond sont stockes dans
+l'etat d'edition de chaque photo.
 
-Modele attendu :
+Assets attendus :
 
-- `public/models/mediapipe/selfie_segmenter.tflite`
+- modele : `public/models/rmbg2/model.onnx`
+- runtime ONNX : `public/ort/`
 
-Installation locale du modele personne/fond :
+Les fichiers ONNX Runtime `.wasm` et `.mjs` sont copies depuis
+`node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded*` vers `public/ort/`.
+Si le navigateur affiche une erreur de chargement `.wasm`, verifiez que ces
+fichiers existent apres `npm install` et que l'app est servie par Vite ou par le
+build, pas ouverte directement depuis le fichier `index.html`.
+
+Le modele `model.onnx` n'est pas telecharge automatiquement et n'est pas
+committe. Placez-le manuellement :
 
 ```powershell
-Invoke-WebRequest `
-  -Uri "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite" `
-  -OutFile "public/models/mediapipe/selfie_segmenter.tflite"
+New-Item -ItemType Directory -Force public/models/rmbg2
+# Copier ensuite votre fichier RMBG-2.0 ONNX ici :
+# public/models/rmbg2/model.onnx
 ```
 
-Les fichiers `.tflite` sont ignores par Git pour eviter de committer les assets
-modele. Les WASM MediaPipe restent attendus dans `public/models/mediapipe/wasm/`.
+BRIA RMBG-2.0 est soumis à licence. Vérifier les conditions d’usage, notamment commercial, avant utilisation réelle.
 
-Le lot actuel utilise Image Segmenter pour produire un premier masque, puis un
-raffinement local par seuil, lissage, contour progressif et points
-personne/fond. L'Interactive Segmenter n'est pas encore branche : les points
-appliquent une correction locale douce autour du clic.
+Validation manuelle :
+
+- lancer l'app : `npm run dev`
+- ouvrir le mode `Fond`
+- cliquer `Charger / verifier le modele`
+- verifier WebGPU : lire `Backend actif` et `Provider ONNX`
+- forcer CPU : choisir `CPU WASM` dans `Backend fond`
+- comparer `Original`, `Masque` et `Fond remplace`
+- verifier l'export : activer `Remplacer le fond dans les exports`, exporter le
+  JPEG et comparer visuellement le fond remplace
+
+Le mode `Auto` tente WebGPU puis CPU/WASM. Le mode `GPU WebGPU` ne bascule pas
+silencieusement vers CPU : en cas d'echec, selectionnez explicitement `CPU WASM`.
+Les noms d'entree/sortie ONNX detectes et la taille du masque sont affiches dans
+les details techniques du panneau Fond.
+
+Un moteur legacy/fallback peut rester disponible dans le code s'il existe deja,
+mais RMBG-2.0 est le moteur cible de ce lot. Les exports JPEG, ZIP, planche A4
+et impression utilisent le fond remplace quand il est active, sans inclure les
+overlays de guide, masque diagnostic ou points de correction.
 
 Limites connues a verifier visuellement :
 
