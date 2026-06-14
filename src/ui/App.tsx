@@ -587,7 +587,7 @@ export function App() {
           manualPoints: facePoints,
           diagnostics,
           message:
-            "3 points visage places automatiquement. Deplacez-les si besoin, puis cadrez a partir des points.",
+            "4 points visage places automatiquement. Verifiez les deux yeux, le menton et le sommet avant cadrage.",
         },
       }));
     } catch (detectError) {
@@ -621,7 +621,7 @@ export function App() {
           pointEditMode: enabled ? "place" : "none",
           showFacePoints: enabled ? true : faceDetection.showFacePoints,
           message: enabled
-            ? "Cliquez centre des yeux, menton, puis sommet du crane si utile."
+            ? "Cliquez oeil gauche, oeil droit, menton, puis sommet du crane."
             : faceDetection.message,
         },
       };
@@ -682,7 +682,7 @@ export function App() {
           status: "error",
           diagnostics: [],
           message:
-            "Placez les trois points visage : yeux, menton et sommet du crane.",
+            "Placez au minimum les deux yeux et le menton. Le sommet affine la hauteur visage.",
         },
       }));
       return;
@@ -1051,7 +1051,7 @@ export function App() {
             showFacePoints: true,
             pointEditMode: "place",
             manualPoints,
-            message: `${manualPoints.length}/3 point(s) visage place(s).`,
+            message: `${Math.min(manualPoints.length, 4)}/4 point(s) visage place(s).`,
           },
         };
       });

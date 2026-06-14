@@ -70,7 +70,9 @@ export function createFacePlacementFromFacePoints(
   imageSize: Size,
   message = "Cadrage applique a partir des points visage. Verifiez le guide avant export.",
 ): FacePlacementResult {
-  const eyesCenter = getManualPoint(manualPoints, "eyesCenter");
+  const leftEye = getManualPoint(manualPoints, "leftEye");
+  const rightEye = getManualPoint(manualPoints, "rightEye");
+  const eyesCenter = getEyesCenterFromFacePoints(manualPoints);
   const chin = getManualPoint(manualPoints, "chin");
   const skullTop = getManualPoint(manualPoints, "skullTop");
 
@@ -81,11 +83,22 @@ export function createFacePlacementFromFacePoints(
         {
           code: "incomplete-landmarks",
           severity: "warning",
-          message: "Placez au minimum le centre des yeux et le menton.",
+          message: "Placez au minimum les deux yeux et le menton.",
         },
       ],
-      message: "Placez au minimum le centre des yeux et le menton.",
+      message: "Placez au minimum les deux yeux et le menton.",
     };
+  }
+
+  const diagnostics: FaceDiagnostic[] = [];
+
+  if (!leftEye || !rightEye) {
+    diagnostics.push({
+      code: "eye-axis-missing",
+      severity: "info",
+      message:
+        "La rotation fine exige les deux yeux. Le cadrage utilise le point yeux legacy sans rotation automatique.",
+    });
   }
 
   return createFacePlacementFromSourcePoints(
@@ -93,11 +106,29 @@ export function createFacePlacementFromFacePoints(
       eyesCenter,
       chin,
       ...(skullTop ? { skullTop } : {}),
+      ...(leftEye ? { leftEye } : {}),
+      ...(rightEye ? { rightEye } : {}),
     },
     imageSize,
-    [],
+    diagnostics,
     message,
   );
+}
+
+export function getEyesCenterFromFacePoints(
+  manualPoints: readonly PhotoManualFacePoint[],
+): Point | null {
+  const leftEye = getManualPoint(manualPoints, "leftEye");
+  const rightEye = getManualPoint(manualPoints, "rightEye");
+
+  if (leftEye && rightEye) {
+    return {
+      x: (leftEye.x + rightEye.x) / 2,
+      y: (leftEye.y + rightEye.y) / 2,
+    };
+  }
+
+  return getManualPoint(manualPoints, "eyesCenter");
 }
 
 export function createFacePlacementFromSourcePoints(
@@ -112,6 +143,14 @@ export function createFacePlacementFromSourcePoints(
 
   if (points.skullTop) {
     assertFinitePoint(points.skullTop, "skullTop");
+  }
+
+  if (points.leftEye) {
+    assertFinitePoint(points.leftEye, "leftEye");
+  }
+
+  if (points.rightEye) {
+    assertFinitePoint(points.rightEye, "rightEye");
   }
 
   const guide = getFranceOfficialFaceGuide();

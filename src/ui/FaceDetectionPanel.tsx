@@ -91,8 +91,8 @@ export function FaceDetectionPanel({
       </label>
 
       <p className="manual-note">
-        Points visage : {facePointCount}/3. Ordre manuel : yeux, menton,
-        sommet du crane.
+        Points visage : {Math.min(facePointCount, 4)}/4. Ordre manuel : oeil gauche,
+        oeil droit, menton, sommet du crane.
       </p>
 
       <div className="button-row">

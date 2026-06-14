@@ -98,7 +98,12 @@ export type BackgroundEditState = {
   message: string;
 };
 
-export type PhotoManualFacePointKind = "eyesCenter" | "chin" | "skullTop";
+export type PhotoManualFacePointKind =
+  | "leftEye"
+  | "rightEye"
+  | "eyesCenter"
+  | "chin"
+  | "skullTop";
 
 export type PhotoManualFacePoint = {
   kind: PhotoManualFacePointKind;
@@ -274,8 +279,12 @@ export function clampCopies(copies: number, maxCopies: number): number {
 export function getNextManualFacePointKind(
   manualPoints: readonly PhotoManualFacePoint[],
 ): PhotoManualFacePointKind {
-  if (!manualPoints.some((point) => point.kind === "eyesCenter")) {
-    return "eyesCenter";
+  if (!manualPoints.some((point) => point.kind === "leftEye")) {
+    return "leftEye";
+  }
+
+  if (!manualPoints.some((point) => point.kind === "rightEye")) {
+    return "rightEye";
   }
 
   if (!manualPoints.some((point) => point.kind === "chin")) {
@@ -302,15 +311,25 @@ export function upsertManualFacePoint(
 export function hasAllFacePoints(
   manualPoints: readonly PhotoManualFacePoint[],
 ): boolean {
+  const hasEyePair =
+    manualPoints.some((point) => point.kind === "leftEye") &&
+    manualPoints.some((point) => point.kind === "rightEye");
+  const hasLegacyEyesCenter = manualPoints.some((point) => point.kind === "eyesCenter");
+  const hasChin = manualPoints.some((point) => point.kind === "chin");
+  const hasSkullTop = manualPoints.some((point) => point.kind === "skullTop");
+
   return (
-    manualPoints.some((point) => point.kind === "eyesCenter") &&
-    manualPoints.some((point) => point.kind === "chin") &&
-    manualPoints.some((point) => point.kind === "skullTop")
+    (hasEyePair && hasChin) ||
+    (hasLegacyEyesCenter && hasChin && hasSkullTop)
   );
 }
 
 export function getManualFacePointLabel(kind: PhotoManualFacePointKind): string {
   switch (kind) {
+    case "leftEye":
+      return "Oeil G";
+    case "rightEye":
+      return "Oeil D";
     case "eyesCenter":
       return "Yeux";
     case "chin":
@@ -367,11 +386,15 @@ function getDefaultDisplayName(fileName: string): string {
 
 function getManualPointOrder(kind: PhotoManualFacePointKind): number {
   switch (kind) {
-    case "eyesCenter":
+    case "leftEye":
       return 0;
-    case "chin":
+    case "rightEye":
       return 1;
-    case "skullTop":
+    case "eyesCenter":
       return 2;
+    case "chin":
+      return 3;
+    case "skullTop":
+      return 4;
   }
 }

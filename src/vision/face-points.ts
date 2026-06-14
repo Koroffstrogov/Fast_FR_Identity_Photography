@@ -14,8 +14,12 @@ export function createFacePointsFromCandidate(
 ): PhotoManualFacePoint[] {
   return [
     {
-      kind: "eyesCenter",
-      ...normalizedToPhotoPoint(face.eyesCenter, imageSize),
+      kind: "leftEye",
+      ...normalizedToPhotoPoint(face.leftEye, imageSize),
+    },
+    {
+      kind: "rightEye",
+      ...normalizedToPhotoPoint(face.rightEye, imageSize),
     },
     {
       kind: "chin",

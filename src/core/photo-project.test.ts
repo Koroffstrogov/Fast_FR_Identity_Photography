@@ -10,13 +10,20 @@ import {
 
 describe("photo project manual face points", () => {
   it("returns the manual assistant point order", () => {
-    expect(getNextManualFacePointKind([])).toBe("eyesCenter");
+    expect(getNextManualFacePointKind([])).toBe("leftEye");
     expect(
-      getNextManualFacePointKind([{ kind: "eyesCenter", xPx: 1, yPx: 2 }]),
+      getNextManualFacePointKind([{ kind: "leftEye", xPx: 1, yPx: 2 }]),
+    ).toBe("rightEye");
+    expect(
+      getNextManualFacePointKind([
+        { kind: "leftEye", xPx: 1, yPx: 2 },
+        { kind: "rightEye", xPx: 2, yPx: 3 },
+      ]),
     ).toBe("chin");
     expect(
       getNextManualFacePointKind([
-        { kind: "eyesCenter", xPx: 1, yPx: 2 },
+        { kind: "leftEye", xPx: 1, yPx: 2 },
+        { kind: "rightEye", xPx: 2, yPx: 3 },
         { kind: "chin", xPx: 3, yPx: 4 },
       ]),
     ).toBe("skullTop");
@@ -26,24 +33,36 @@ describe("photo project manual face points", () => {
     const points = upsertManualFacePoint(
       [
         { kind: "chin", xPx: 10, yPx: 20 },
-        { kind: "eyesCenter", xPx: 5, yPx: 8 },
+        { kind: "rightEye", xPx: 8, yPx: 8 },
+        { kind: "leftEye", xPx: 5, yPx: 8 },
       ],
       { kind: "chin", xPx: 30, yPx: 40 },
     );
 
     expect(points).toEqual([
-      { kind: "eyesCenter", xPx: 5, yPx: 8 },
+      { kind: "leftEye", xPx: 5, yPx: 8 },
+      { kind: "rightEye", xPx: 8, yPx: 8 },
       { kind: "chin", xPx: 30, yPx: 40 },
     ]);
   });
 
-  it("requires eyes, chin and skull top for complete face points", () => {
+  it("requires both eyes and chin for point-based framing", () => {
     expect(
       hasAllFacePoints([
-        { kind: "eyesCenter", xPx: 5, yPx: 8 },
+        { kind: "leftEye", xPx: 5, yPx: 8 },
         { kind: "chin", xPx: 30, yPx: 40 },
       ]),
     ).toBe(false);
+    expect(
+      hasAllFacePoints([
+        { kind: "leftEye", xPx: 5, yPx: 8 },
+        { kind: "rightEye", xPx: 15, yPx: 8 },
+        { kind: "chin", xPx: 30, yPx: 40 },
+      ]),
+    ).toBe(true);
+  });
+
+  it("keeps legacy eyes center points compatible when skull top is present", () => {
     expect(
       hasAllFacePoints([
         { kind: "eyesCenter", xPx: 5, yPx: 8 },

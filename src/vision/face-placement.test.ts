@@ -8,6 +8,7 @@ import {
   createFacePlacementFromCandidate,
   createFacePlacementFromManualPoints,
   createFacePlacementFromSourcePoints,
+  getEyesCenterFromFacePoints,
   sourceImagePointToCanvasPoint,
 } from "./face-placement";
 
@@ -15,7 +16,8 @@ describe("face placement", () => {
   it("converts manual face points into an image transform", () => {
     const placement = createFacePlacementFromManualPoints(
       [
-        { kind: "eyesCenter", xPx: 500, yPx: 430 },
+        { kind: "leftEye", xPx: 420, yPx: 430 },
+        { kind: "rightEye", xPx: 580, yPx: 430 },
         { kind: "chin", xPx: 500, yPx: 700 },
       ],
       { width: 1000, height: 1000 },
@@ -29,7 +31,10 @@ describe("face placement", () => {
 
   it("does not return a transform when manual points are incomplete", () => {
     const placement = createFacePlacementFromManualPoints(
-      [{ kind: "eyesCenter", xPx: 500, yPx: 430 }],
+      [
+        { kind: "leftEye", xPx: 420, yPx: 430 },
+        { kind: "rightEye", xPx: 580, yPx: 430 },
+      ],
       { width: 1000, height: 1000 },
     );
 
@@ -42,7 +47,8 @@ describe("face placement", () => {
   it("clamps zoom to the minimum available value", () => {
     const placement = createFacePlacementFromManualPoints(
       [
-        { kind: "eyesCenter", xPx: 500, yPx: 0 },
+        { kind: "leftEye", xPx: 420, yPx: 0 },
+        { kind: "rightEye", xPx: 580, yPx: 0 },
         { kind: "chin", xPx: 500, yPx: 1000 },
       ],
       { width: 1000, height: 1000 },
@@ -57,7 +63,8 @@ describe("face placement", () => {
   it("clamps zoom to the maximum available value", () => {
     const placement = createFacePlacementFromManualPoints(
       [
-        { kind: "eyesCenter", xPx: 500, yPx: 500 },
+        { kind: "leftEye", xPx: 420, yPx: 500 },
+        { kind: "rightEye", xPx: 580, yPx: 500 },
         { kind: "chin", xPx: 500, yPx: 505 },
       ],
       { width: 1000, height: 1000 },
@@ -81,6 +88,47 @@ describe("face placement", () => {
     );
 
     expect(placement.transform?.rotationDegrees).toBeLessThan(0);
+  });
+
+  it("computes the eye center from two separate manual eye points", () => {
+    const center = getEyesCenterFromFacePoints([
+      { kind: "leftEye", xPx: 420, yPx: 430 },
+      { kind: "rightEye", xPx: 580, yPx: 450 },
+    ]);
+
+    expect(center).toEqual({ x: 500, y: 440 });
+  });
+
+  it("applies a rotation from tilted manual eye points", () => {
+    const placement = createFacePlacementFromManualPoints(
+      [
+        { kind: "leftEye", xPx: 420, yPx: 430 },
+        { kind: "rightEye", xPx: 580, yPx: 470 },
+        { kind: "chin", xPx: 500, yPx: 700 },
+        { kind: "skullTop", xPx: 500, yPx: 120 },
+      ],
+      { width: 1000, height: 1000 },
+    );
+
+    expect(placement.transform).not.toBeNull();
+    expect(placement.transform?.rotationDegrees).toBeLessThan(0);
+  });
+
+  it("keeps legacy eyes center points working without fine rotation", () => {
+    const placement = createFacePlacementFromManualPoints(
+      [
+        { kind: "eyesCenter", xPx: 500, yPx: 430 },
+        { kind: "chin", xPx: 500, yPx: 700 },
+        { kind: "skullTop", xPx: 500, yPx: 120 },
+      ],
+      { width: 1000, height: 1000 },
+    );
+
+    expect(placement.transform).not.toBeNull();
+    expect(placement.transform?.rotationDegrees).toBe(0);
+    expect(placement.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+      "eye-axis-missing",
+    );
   });
 
   it("prioritizes the automatic skull top and chin over the indicative eye line", () => {
@@ -171,7 +219,8 @@ describe("face placement", () => {
 
   it("uses an optional skull top point for manual target face height", () => {
     const manualPoints: PhotoManualFacePoint[] = [
-      { kind: "eyesCenter", xPx: 500, yPx: 430 },
+      { kind: "leftEye", xPx: 420, yPx: 430 },
+      { kind: "rightEye", xPx: 580, yPx: 430 },
       { kind: "chin", xPx: 500, yPx: 770 },
       { kind: "skullTop", xPx: 500, yPx: 170 },
     ];

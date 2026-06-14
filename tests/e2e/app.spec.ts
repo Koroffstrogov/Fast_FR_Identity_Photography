@@ -158,19 +158,28 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   await expect(page.getByLabel("Afficher les points du visage")).not.toBeChecked();
   await page.getByLabel("Afficher les points du visage").check();
   await page.getByRole("button", { name: "Placer les points du visage manuellement" }).click();
-  await expect(page.getByText("Points visage : 0/3.")).toBeVisible();
-  await canvas.click({ position: { x: 206, y: 239 } });
-  await expect(page.getByText("1/3 point(s) visage place(s).")).toBeVisible();
+  await expect(page.getByText("Points visage : 0/4.")).toBeVisible();
+  await canvas.click({ position: { x: 175, y: 230 } });
+  await expect(page.getByText("1/4 point(s) visage place(s).")).toBeVisible();
+  await canvas.click({ position: { x: 238, y: 250 } });
+  await expect(page.getByText("2/4 point(s) visage place(s).")).toBeVisible();
   await canvas.click({ position: { x: 206, y: 398 } });
-  await expect(page.getByText("2/3 point(s) visage place(s).")).toBeVisible();
+  await expect(page.getByText("3/4 point(s) visage place(s).")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Cadrer a partir de points" }),
+  ).toBeEnabled();
   await canvas.click({ position: { x: 206, y: 120 } });
-  await expect(page.getByText("3/3 point(s) visage place(s).")).toBeVisible();
+  await expect(page.getByText("4/4 point(s) visage place(s).")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Cadrer a partir de points" }),
   ).toBeEnabled();
   await expect(page.getByRole("button", { name: "Deplacer un point" })).toBeEnabled();
+  await page.getByRole("button", { name: "Cadrer a partir de points" }).click();
+  await expect
+    .poll(async () => Math.abs(Number(await page.getByRole("slider", { name: "Rotation" }).inputValue())))
+    .toBeGreaterThan(0.1);
   await page.getByRole("button", { name: "Supprimer les points" }).click();
-  await expect(page.getByText("Points visage : 0/3.")).toBeVisible();
+  await expect(page.getByText("Points visage : 0/4.")).toBeVisible();
 
   await page.getByRole("button", { name: "Fond", exact: true }).click();
   await expect(canvas).toBeVisible();

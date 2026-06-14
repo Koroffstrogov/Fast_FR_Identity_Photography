@@ -14,9 +14,11 @@ const MIN_MODEL_SIZE_BYTES = 1_000_000;
 const ZIP_MAGIC_FIRST_BYTE = 0x50;
 const ZIP_MAGIC_SECOND_BYTE = 0x4b;
 const ZIP_MAGIC_SCAN_BYTES = 16;
+const MODEL_PROBE_BYTES = 64;
 
 let landmarker: FaceLandmarker | null = null;
 let loadingPromise: Promise<FaceLandmarker> | null = null;
+let modelProbePromise: Promise<void> | null = null;
 let modelStatus: FaceLandmarkerModelStatus = "idle";
 
 export function getFaceLandmarkerStatus(): FaceLandmarkerModelStatus {
@@ -67,14 +69,14 @@ export function getFaceLandmarkerErrorMessage(error: unknown): string {
 }
 
 async function createFaceLandmarker(): Promise<FaceLandmarker> {
-  const modelBuffer = await loadLocalFaceLandmarkerModel();
+  await probeLocalFaceLandmarkerModel();
   const visionFileset = await FilesetResolver.forVisionTasks(
     FACE_LANDMARKER_WASM_PATH,
   );
 
   return FaceLandmarker.createFromOptions(visionFileset, {
     baseOptions: {
-      modelAssetBuffer: modelBuffer,
+      modelAssetPath: FACE_LANDMARKER_MODEL_PATH,
       delegate: "CPU",
     },
     runningMode: "IMAGE",
@@ -87,9 +89,23 @@ async function createFaceLandmarker(): Promise<FaceLandmarker> {
   });
 }
 
-async function loadLocalFaceLandmarkerModel(): Promise<Uint8Array> {
+async function probeLocalFaceLandmarkerModel(): Promise<void> {
+  if (!modelProbePromise) {
+    modelProbePromise = loadFaceLandmarkerModelHeader().catch((error: unknown) => {
+      modelProbePromise = null;
+      throw error;
+    });
+  }
+
+  await modelProbePromise;
+}
+
+async function loadFaceLandmarkerModelHeader(): Promise<void> {
   const response = await fetch(FACE_LANDMARKER_MODEL_PATH, {
-    cache: "no-store",
+    cache: "force-cache",
+    headers: {
+      Range: `bytes=0-${MODEL_PROBE_BYTES - 1}`,
+    },
   });
 
   if (!response.ok) {
@@ -99,27 +115,43 @@ async function loadLocalFaceLandmarkerModel(): Promise<Uint8Array> {
   }
 
   const contentType = response.headers.get("content-type") ?? "";
-  const modelBuffer = new Uint8Array(await response.arrayBuffer());
+  const contentRange = response.headers.get("content-range");
+  const contentLength = response.headers.get("content-length");
+  const declaredSize = getDeclaredModelSize(contentRange, contentLength);
+  const modelHeader = new Uint8Array(await response.arrayBuffer());
 
-  if (contentType.includes("text/html") || looksLikeHtml(modelBuffer)) {
+  if (contentType.includes("text/html") || looksLikeHtml(modelHeader)) {
     throw new Error(
       `Le chemin ${FACE_LANDMARKER_MODEL_PATH} renvoie une page HTML au lieu du modele .task.`,
     );
   }
 
-  if (modelBuffer.byteLength < MIN_MODEL_SIZE_BYTES) {
+  if (declaredSize !== undefined && declaredSize < MIN_MODEL_SIZE_BYTES) {
     throw new Error(
-      `Le fichier modele ${FACE_LANDMARKER_MODEL_PATH} est trop petit (${modelBuffer.byteLength} octets). Il est probablement incomplet.`,
+      `Le fichier modele ${FACE_LANDMARKER_MODEL_PATH} est trop petit (${declaredSize} octets). Il est probablement incomplet.`,
     );
   }
 
-  if (!hasZipMagicNearStart(modelBuffer)) {
+  if (!hasZipMagicNearStart(modelHeader)) {
     throw new Error(
       `Le fichier modele ${FACE_LANDMARKER_MODEL_PATH} n'a pas le format MediaPipe attendu.`,
     );
   }
+}
 
-  return modelBuffer;
+function getDeclaredModelSize(
+  contentRange: string | null,
+  contentLength: string | null,
+): number | undefined {
+  const rangeSize = contentRange?.match(/\/(\d+)$/)?.[1];
+  const declaredSize = rangeSize ?? contentLength;
+
+  if (!declaredSize) {
+    return undefined;
+  }
+
+  const size = Number(declaredSize);
+  return Number.isFinite(size) ? size : undefined;
 }
 
 function hasZipMagicNearStart(buffer: Uint8Array): boolean {

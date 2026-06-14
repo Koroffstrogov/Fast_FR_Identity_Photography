@@ -24,6 +24,7 @@ export type FaceDiagnosticCode =
   | "face-too-tilted"
   | "face-too-small"
   | "low-confidence"
+  | "eye-axis-missing"
   | "zoom-clamped";
 
 export type FaceDiagnostic = {

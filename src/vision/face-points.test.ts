@@ -6,7 +6,7 @@ import {
 } from "./face-points";
 
 describe("face points", () => {
-  it("creates eyes, chin and skull top points from an automatic candidate", () => {
+  it("creates left eye, right eye, chin and skull top points from an automatic candidate", () => {
     const points = createFacePointsFromCandidate(
       {
         index: 0,
@@ -32,17 +32,21 @@ describe("face points", () => {
     );
 
     expect(points.map((point) => point.kind)).toEqual([
-      "eyesCenter",
+      "leftEye",
+      "rightEye",
       "chin",
       "skullTop",
     ]);
-    expect(points[2]).toMatchObject({ xPx: 500, yPx: 64 });
+    expect(points[0]).toMatchObject({ xPx: 400, yPx: 320 });
+    expect(points[1]).toMatchObject({ xPx: 600, yPx: 320 });
+    expect(points[3]).toMatchObject({ xPx: 500, yPx: 64 });
   });
 
   it("selects the nearest visible face point inside the hit radius", () => {
     const pointKind = findNearestFacePointKind(
       [
-        { kind: "eyesCenter", xPx: 500, yPx: 300 },
+        { kind: "leftEye", xPx: 450, yPx: 300 },
+        { kind: "rightEye", xPx: 550, yPx: 300 },
         { kind: "chin", xPx: 500, yPx: 650 },
         { kind: "skullTop", xPx: 500, yPx: 80 },
       ],
