@@ -1,4 +1,8 @@
 import { DEFAULT_IMAGE_TRANSFORM, ImageTransform } from "./geometry";
+import {
+  QualityEditState,
+  getDefaultQualityEditState,
+} from "../quality/quality-state";
 
 export type PhotoEditState = {
   transform: ImageTransform;
@@ -83,6 +87,7 @@ export type PhotoItem<TImage = HTMLImageElement> = {
   editState: PhotoEditState;
   faceDetection?: PhotoFaceDetectionState;
   backgroundEdit?: BackgroundEditState;
+  qualityEdit?: QualityEditState;
   sheetCopies: number;
 };
 
@@ -148,6 +153,7 @@ export function createPhotoItem<TImage>(
     editState: getDefaultPhotoEditState(),
     faceDetection: getDefaultPhotoFaceDetectionState(),
     backgroundEdit: getDefaultBackgroundEditState(),
+    qualityEdit: getDefaultQualityEditState(),
     sheetCopies: DEFAULT_SHEET_COPIES,
   };
 }

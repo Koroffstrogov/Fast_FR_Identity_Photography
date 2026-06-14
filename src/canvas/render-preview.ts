@@ -29,6 +29,7 @@ export function renderFinalPhotoPreviewToCanvas(
     photo.editState.transform,
     photo.backgroundEdit,
     "preview",
+    photo.qualityEdit,
   );
 }
 

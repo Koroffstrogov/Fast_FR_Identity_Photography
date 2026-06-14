@@ -184,7 +184,14 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
 
   await page.getByRole("button", { name: "Qualite", exact: true }).click();
   await expect(canvas).toBeVisible();
-  await expect(page.getByText("Diagnostic qualite prevu pour un prochain lot.")).toBeVisible();
+  await expect(page.getByRole("group", { name: "Diagnostic qualite" })).toBeVisible();
+  await expect(
+    page.getByText("Diagnostic indicatif, ne garantit pas l'acceptation officielle."),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Amelioration auto legere" }).click();
+  await expect(page.getByLabel("Apercu corrige exporte")).toBeVisible();
+  await page.getByRole("button", { name: "Reinitialiser qualite" }).click();
+  await expect(page.getByLabel("Apercu corrige exporte")).toBeVisible();
 
   await page.getByRole("slider", { name: "Zoom" }).evaluate((input) => {
     const range = input as HTMLInputElement;

@@ -67,6 +67,7 @@ function renderPhotoToJpegBlob(photo: PhotoItem): Promise<Blob> {
     photo.editState.transform,
     photo.backgroundEdit,
     "export",
+    photo.qualityEdit,
   );
 
   return new Promise((resolve, reject) => {

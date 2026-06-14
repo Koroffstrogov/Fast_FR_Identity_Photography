@@ -1067,6 +1067,137 @@ button {
   font-weight: 800;
 }
 
+.quality-panel-stack {
+  align-content: start;
+}
+
+.quality-diagnostics {
+  display: grid;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.quality-diagnostics.empty-state {
+  border: 1px dashed #c8d2ce;
+  border-radius: 8px;
+  padding: 12px;
+  color: #637179;
+  background: #f8faf9;
+}
+
+.quality-score-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #d8e1de;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #eef7f4;
+}
+
+.quality-score-card.status-warning {
+  background: #fff7ed;
+}
+
+.quality-score-card.status-problem {
+  background: #fff1f2;
+}
+
+.quality-score-card span {
+  font-weight: 800;
+}
+
+.quality-score-card strong {
+  font-size: 1.25rem;
+}
+
+.quality-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.quality-metrics div {
+  min-width: 0;
+  border: 1px solid #edf2f0;
+  border-radius: 8px;
+  padding: 8px;
+  background: #fbfcfc;
+}
+
+.quality-metrics dt {
+  color: #637179;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.quality-metrics dd {
+  margin: 4px 0 0;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.quality-row-list {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.quality-row {
+  display: grid;
+  gap: 3px;
+  border-left: 4px solid #2f7d68;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f8faf9;
+}
+
+.quality-row.status-warning {
+  border-left-color: #d97706;
+}
+
+.quality-row.status-problem {
+  border-left-color: #be123c;
+}
+
+.quality-row span,
+.quality-row small {
+  color: #4e5a60;
+  font-weight: 650;
+}
+
+.before-after-preview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.before-after-preview figure {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+}
+
+.before-after-preview figcaption {
+  color: #637179;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.before-after-preview canvas {
+  width: 100%;
+  height: auto;
+  border: 1px solid #d8e1de;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
 .bottom-toolbar {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);

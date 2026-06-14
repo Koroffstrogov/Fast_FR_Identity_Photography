@@ -14,7 +14,7 @@ Assets attendus en local :
 
 Les fichiers WASM sont copies depuis `@mediapipe/tasks-vision`. Le fichier
 `.task` n'est pas fourni automatiquement : ajoutez-le dans le chemin ci-dessus
-avant d'utiliser le bouton `Detecter le visage`.
+avant d'utiliser le bouton `Placer les points automatiquement`.
 
 Modele officiel MediaPipe : la documentation Google AI Edge liste un bundle
 Face Landmarker telechargeable pour cette tache. Pour l'installer localement :
@@ -29,6 +29,28 @@ Le fichier `.task` est ignore par Git pour eviter de committer un asset modele.
 
 Le cadrage automatique est une aide initiale. Verifiez toujours le menton, le
 sommet du crane et la ligne des yeux avec le guide avant export ou impression.
+
+## Diagnostic qualite local
+
+Le mode `Qualite` analyse localement le rendu final 35 x 45 mm : exposition,
+contraste, clipping des ombres/hautes lumieres, dominante couleur approximative
+et nettete indicative. Le diagnostic est une aide visuelle et ne garantit pas
+l'acceptation officielle d'une photo.
+
+Le bouton `Amelioration auto legere` applique uniquement des corrections
+prudentes : exposition, contraste, temperature, saturation et nettete legere.
+Il ne fait pas de retouche beaute, ne lisse pas la peau et ne modifie pas la
+forme du visage, les yeux, la bouche ou les dents. Les corrections sont stockees
+par photo et appliquees localement aux apercus finaux, exports JPEG, ZIP,
+planche A4 et impression.
+
+Limites connues du diagnostic qualite :
+
+- photo tres floue ;
+- ombres fortes ;
+- eclairage tres jaune ;
+- arriere-plan irregulier ;
+- image tres compressee.
 
 ## Suppression locale du fond
 

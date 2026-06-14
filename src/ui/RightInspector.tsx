@@ -2,11 +2,13 @@ import { FileNamingTemplateId } from "../core/file-naming";
 import { PhotoItem } from "../core/photo-project";
 import { PRINT_LAYOUTS, PrintLayoutMode } from "../core/print-layout";
 import { SheetComposition } from "../core/sheet-items";
+import { QualityEditState } from "../quality/quality-state";
 import { BackgroundSegmenterStatus } from "../vision/background-segmenter";
 import { FaceLandmarkerModelStatus } from "../vision/face-landmarker";
 import { BackgroundPanel, BackgroundPointMode } from "./BackgroundPanel";
 import { ExportPanel } from "./ExportPanel";
 import { FaceDetectionPanel } from "./FaceDetectionPanel";
+import { QualityPanel } from "./QualityPanel";
 import { AppMode, getAppModeLabel } from "./app-mode";
 
 type RightInspectorProps = {
@@ -35,6 +37,10 @@ type RightInspectorProps = {
   onBackgroundChange: (partialEdit: Partial<NonNullable<PhotoItem["backgroundEdit"]>>) => void;
   onBackgroundPointModeChange: (mode: BackgroundPointMode) => void;
   onResetBackgroundPoints: () => void;
+  onQualityChange: (partialEdit: Partial<QualityEditState>) => void;
+  onAutoQuality: () => void;
+  onResetQuality: () => void;
+  onRecalculateQuality: () => void;
   onFileNamingTemplateChange: (templateId: FileNamingTemplateId) => void;
   onSheetModeChange: (mode: PrintLayoutMode) => void;
   onExportPhoto: () => void;
@@ -70,6 +76,10 @@ export function RightInspector({
   onBackgroundChange,
   onBackgroundPointModeChange,
   onResetBackgroundPoints,
+  onQualityChange,
+  onAutoQuality,
+  onResetQuality,
+  onRecalculateQuality,
   onFileNamingTemplateChange,
   onSheetModeChange,
   onExportPhoto,
@@ -122,7 +132,15 @@ export function RightInspector({
         />
       )}
 
-      {mode === "quality" && <QualityPlaceholder photo={photo} />}
+      {mode === "quality" && (
+        <QualityPanel
+          photo={photo}
+          onQualityChange={onQualityChange}
+          onAutoQuality={onAutoQuality}
+          onResetQuality={onResetQuality}
+          onRecalculateQuality={onRecalculateQuality}
+        />
+      )}
 
       {mode === "sheet" && (
         <SheetInspector
@@ -200,35 +218,6 @@ function GuideSection({
         sommet du crane, hors cheveux.
       </p>
     </fieldset>
-  );
-}
-
-function QualityPlaceholder({ photo }: { photo: PhotoItem | null }) {
-  return (
-    <div className="inspector-stack">
-      <fieldset className="quality-panel">
-        <legend>Reglages qualite</legend>
-        <label className="slider-control">
-          <span>Luminosite</span>
-          <output>0</output>
-          <input aria-label="Luminosite" type="range" min="-50" max="50" value="0" disabled />
-        </label>
-        <label className="slider-control">
-          <span>Contraste</span>
-          <output>0</output>
-          <input aria-label="Contraste" type="range" min="-50" max="50" value="0" disabled />
-        </label>
-        <label className="slider-control">
-          <span>Saturation</span>
-          <output>0</output>
-          <input aria-label="Saturation" type="range" min="-50" max="50" value="0" disabled />
-        </label>
-        <p className="manual-note">
-          Diagnostic qualite prevu pour un prochain lot.
-          {photo ? ` Photo active : ${photo.displayName}.` : ""}
-        </p>
-      </fieldset>
-    </div>
   );
 }
 

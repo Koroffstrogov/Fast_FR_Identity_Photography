@@ -53,6 +53,13 @@ import {
 } from "../export/export-batch";
 import { createPhotosZip, downloadZip } from "../export/export-zip";
 import { openA4PrintPage } from "../print/open-print-page";
+import { analyzeRenderedPhotoQuality } from "../quality/analyze-photo-quality";
+import { createAutoQualityEdit } from "../quality/auto-quality";
+import {
+  QualityEditState,
+  clampQualityEditState,
+  getDefaultQualityEditState,
+} from "../quality/quality-state";
 import { BackgroundPointMode } from "./BackgroundPanel";
 import { BottomToolbar } from "./BottomToolbar";
 import { LeftPhotoPanel } from "./LeftPhotoPanel";
@@ -145,6 +152,7 @@ export function App() {
         activePhoto.editState.transform,
         activePhoto.backgroundEdit,
         "preview",
+        activePhoto.qualityEdit,
       );
     } else if (photoCanvas) {
       preparePhotoCanvas(photoCanvas);
@@ -166,9 +174,9 @@ export function App() {
 
     if (activePhoto) {
       renderFaceGuideOverlay(guideCanvas, {
-        showGuide: activePhoto.editState.showFaceGuide,
+        showGuide: appMode === "crop" && activePhoto.editState.showFaceGuide,
         opacity: activePhoto.editState.faceGuideOpacity,
-        manualPoints: getGuideOverlayPoints(activePhoto),
+        manualPoints: getGuideOverlayPoints(activePhoto, appMode),
       });
       return;
     }
@@ -228,6 +236,32 @@ export function App() {
   }, [activePhotoId, appMode]);
 
   useEffect(() => {
+    if (!activePhoto) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      updatePhotoQualityDiagnostics(activePhoto);
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    activePhotoId,
+    activePhoto?.editState.transform.offsetX,
+    activePhoto?.editState.transform.offsetY,
+    activePhoto?.editState.transform.zoom,
+    activePhoto?.editState.transform.rotationDegrees,
+    activePhoto?.backgroundEdit?.enabled,
+    activePhoto?.backgroundEdit?.replacementColor,
+    activePhoto?.backgroundEdit?.threshold,
+    activePhoto?.backgroundEdit?.featherPx,
+    activePhoto?.backgroundEdit?.edgeSmoothingPx,
+    activePhoto?.backgroundEdit?.preserveHair,
+    activePhoto?.backgroundEdit?.maskVersion,
+    activePhoto?.backgroundEdit?.rawMask,
+  ]);
+
+  useEffect(() => {
     setPhotos((currentPhotos) =>
       currentPhotos.map((photo) => ({
         ...photo,
@@ -279,6 +313,26 @@ export function App() {
     updatePhoto(activePhotoId, updater);
   }
 
+  function updatePhotoQualityDiagnostics(photo: PhotoItem) {
+    try {
+      const diagnostics = analyzeRenderedPhotoQuality(photo);
+
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        qualityEdit: {
+          ...(currentPhoto.qualityEdit ?? getDefaultQualityEditState()),
+          diagnostics,
+        },
+      }));
+    } catch (qualityError) {
+      setError(
+        qualityError instanceof Error
+          ? qualityError.message
+          : "Impossible d'analyser la qualite de la photo.",
+      );
+    }
+  }
+
   function handleTransformChange(partialTransform: Partial<PhotoItem["editState"]["transform"]>) {
     updateActivePhoto((photo) => ({
       ...photo,
@@ -320,6 +374,88 @@ export function App() {
         transform: { ...DEFAULT_IMAGE_TRANSFORM },
       },
     }));
+  }
+
+  function handleQualityChange(partialEdit: Partial<QualityEditState>) {
+    updateActivePhoto((photo) => {
+      const qualityEdit = photo.qualityEdit ?? getDefaultQualityEditState();
+      const changesAdjustments = Object.keys(partialEdit).some(
+        (key) => key !== "enabled" && key !== "diagnostics",
+      );
+
+      return {
+        ...photo,
+        qualityEdit: clampQualityEditState({
+          ...qualityEdit,
+          ...partialEdit,
+          enabled:
+            partialEdit.enabled !== undefined
+              ? partialEdit.enabled
+              : changesAdjustments
+                ? true
+                : qualityEdit.enabled,
+          autoApplied: changesAdjustments ? false : qualityEdit.autoApplied,
+        }),
+      };
+    });
+  }
+
+  function handleAutoQuality() {
+    const photo = activePhoto;
+
+    if (!photo) {
+      return;
+    }
+
+    try {
+      const diagnostics = photo.qualityEdit?.diagnostics ?? analyzeRenderedPhotoQuality(photo);
+      const qualityEdit = createAutoQualityEdit(diagnostics);
+
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        qualityEdit,
+      }));
+      setError("");
+    } catch (qualityError) {
+      setError(
+        qualityError instanceof Error
+          ? qualityError.message
+          : "Impossible d'appliquer l'amelioration automatique.",
+      );
+    }
+  }
+
+  function handleResetQuality() {
+    const photo = activePhoto;
+
+    if (!photo) {
+      return;
+    }
+
+    try {
+      const diagnostics = analyzeRenderedPhotoQuality(photo);
+
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        qualityEdit: {
+          ...getDefaultQualityEditState(),
+          diagnostics,
+        },
+      }));
+      setError("");
+    } catch (qualityError) {
+      setError(
+        qualityError instanceof Error
+          ? qualityError.message
+          : "Impossible de reinitialiser les corrections qualite.",
+      );
+    }
+  }
+
+  function handleRecalculateQuality() {
+    if (activePhoto) {
+      updatePhotoQualityDiagnostics(activePhoto);
+    }
   }
 
   async function ensureFaceModelLoaded(): Promise<string | null> {
@@ -998,6 +1134,7 @@ export function App() {
       activePhoto.editState.transform,
       activePhoto.backgroundEdit,
       "export",
+      activePhoto.qualityEdit,
     );
 
     const link = document.createElement("a");
@@ -1144,6 +1281,10 @@ export function App() {
           onBackgroundChange={handleBackgroundChange}
           onBackgroundPointModeChange={setBackgroundPointMode}
           onResetBackgroundPoints={handleResetBackgroundPoints}
+          onQualityChange={handleQualityChange}
+          onAutoQuality={handleAutoQuality}
+          onResetQuality={handleResetQuality}
+          onRecalculateQuality={handleRecalculateQuality}
           onFileNamingTemplateChange={setFileNamingTemplate}
           onSheetModeChange={setSheetMode}
           onExportPhoto={handleExportPhoto}
@@ -1172,10 +1313,10 @@ function getPhotoImageSize(photo: PhotoItem): Size {
   };
 }
 
-function getGuideOverlayPoints(photo: PhotoItem): GuideOverlayPoint[] {
+function getGuideOverlayPoints(photo: PhotoItem, appMode: AppMode): GuideOverlayPoint[] {
   return [
-    ...getManualFaceGuideOverlayPoints(photo),
-    ...getBackgroundGuideOverlayPoints(photo),
+    ...(appMode === "crop" ? getManualFaceGuideOverlayPoints(photo) : []),
+    ...(appMode === "background" ? getBackgroundGuideOverlayPoints(photo) : []),
   ];
 }
 

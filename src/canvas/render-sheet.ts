@@ -195,6 +195,7 @@ function getRenderedPhotoCanvas(
     item.editState.transform,
     item.backgroundEdit,
     "export",
+    item.qualityEdit,
   );
   renderedPhotos.set(item.id, canvas);
 

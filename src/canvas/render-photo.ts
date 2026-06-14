@@ -1,5 +1,7 @@
 import { PHOTO_FORMAT } from "../core/photo-format";
 import { BackgroundEditState } from "../core/photo-project";
+import { applyQualityToCanvas } from "../quality/apply-quality";
+import { QualityEditState } from "../quality/quality-state";
 import {
   ImageTransform,
   Size,
@@ -31,6 +33,7 @@ export function renderPhotoToCanvas(
   transform: ImageTransform,
   backgroundEdit?: BackgroundEditState,
   output: BackgroundRenderOutput = "preview",
+  qualityEdit?: QualityEditState,
 ): void {
   canvas.width = PHOTO_FORMAT.widthPx;
   canvas.height = PHOTO_FORMAT.heightPx;
@@ -58,6 +61,7 @@ export function renderPhotoToCanvas(
   context.restore();
 
   applyBackgroundToCanvas(canvas, imageSize, transform, backgroundEdit, output);
+  applyQualityToCanvas(canvas, qualityEdit);
 }
 
 function getCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
