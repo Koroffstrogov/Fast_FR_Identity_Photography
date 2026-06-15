@@ -30,7 +30,6 @@ import {
   BackgroundTechnicalDiagnostics,
   OnnxSessionDiagnosticResult,
   PhotoUsage,
-  addBackgroundPoint,
   clampCopies,
   getDefaultBackgroundEditState,
   getDefaultPhotoFaceDetectionState,
@@ -64,7 +63,6 @@ import {
   clampQualityEditState,
   getDefaultQualityEditState,
 } from "../quality/quality-state";
-import { BackgroundPointMode } from "./BackgroundPanel";
 import { BottomToolbar } from "./BottomToolbar";
 import { LeftPhotoPanel } from "./LeftPhotoPanel";
 import { RightInspector } from "./RightInspector";
@@ -112,6 +110,16 @@ type FacePointDragState = {
   pointKind: PhotoManualFacePointKind;
 };
 
+type AutoStatus = "idle" | "running" | "error" | "done";
+type AutoStep = "crop" | "background" | "quality" | "sheet";
+
+type AutoWorkflowError = {
+  kind: "auto-workflow-error";
+  step: AutoStep;
+  mode: AppMode;
+  message: string;
+};
+
 let photoIdCounter = 0;
 
 export function App() {
@@ -134,8 +142,9 @@ export function App() {
   const [backgroundRemovalStatus, setBackgroundRemovalStatus] =
     useState<BackgroundRemovalStatus>("idle");
   const [backgroundRemovalError, setBackgroundRemovalError] = useState("");
-  const [backgroundPointMode, setBackgroundPointMode] =
-    useState<BackgroundPointMode>("none");
+  const [autoStatus, setAutoStatus] = useState<AutoStatus>("idle");
+  const [autoStep, setAutoStep] = useState<AutoStep | null>(null);
+  const [autoMessage, setAutoMessage] = useState("");
   const [editorInteractionMode, setEditorInteractionMode] =
     useState<EditorInteractionMode>("move-photo");
   const [hoveredFacePointKind, setHoveredFacePointKind] =
@@ -347,9 +356,11 @@ export function App() {
 
     if (result.photos.length > 0) {
       setPhotos((currentPhotos) => [...currentPhotos, ...result.photos]);
-      setActivePhotoId((currentActivePhotoId) =>
-        currentActivePhotoId ?? result.photos[0]?.id ?? null,
-      );
+      setActivePhotoId(result.photos.at(-1)?.id ?? null);
+      setAppMode("crop");
+      setAutoStatus("idle");
+      setAutoStep(null);
+      setAutoMessage("");
     }
 
     setImportSummary(summary);
@@ -538,6 +549,336 @@ export function App() {
   function handleRecalculateQuality() {
     if (activePhoto) {
       updatePhotoQualityDiagnostics(activePhoto);
+    }
+  }
+
+  async function handleRunAuto() {
+    const photo = activePhoto;
+
+    if (!photo || autoStatus === "running") {
+      return;
+    }
+
+    dragStateRef.current = null;
+    setIsDraggingPhoto(false);
+    setDraggedFacePointKind(null);
+    setHoveredFacePointKind(null);
+    setEditorInteractionMode("move-photo");
+    setActivePhotoId(photo.id);
+    setAutoStatus("running");
+    setAutoStep("crop");
+    setAutoMessage(`Auto en cours : ${getAutoStepLabel("crop")}`);
+    setError("");
+
+    try {
+      let workingPhoto = await runAutoCropStep(photo);
+      workingPhoto = await runAutoBackgroundStep(workingPhoto);
+      workingPhoto = runAutoQualityStep(workingPhoto);
+
+      setAutoStatus("done");
+      setAutoStep("sheet");
+      setAutoMessage("Auto terminé. Vérifiez la planche avant export ou impression.");
+      setAppMode("sheet");
+      setError("");
+    } catch (autoError) {
+      if (isAutoWorkflowError(autoError)) {
+        setAutoStatus("error");
+        setAutoStep(autoError.step);
+        setAutoMessage(`Auto interrompu : ${autoError.message}`);
+        setAppMode(autoError.mode);
+        setError(autoError.message);
+        return;
+      }
+
+      const message = getUnknownAutoErrorMessage(autoError);
+      setAutoStatus("error");
+      setAutoStep(null);
+      setAutoMessage(`Auto interrompu : ${message}`);
+      setError(message);
+    }
+  }
+
+  async function runAutoCropStep(photo: PhotoItem): Promise<PhotoItem> {
+    setAppMode("crop");
+    setAutoStep("crop");
+    setAutoMessage(`Auto en cours : ${getAutoStepLabel("crop")}`);
+    updatePhoto(photo.id, (currentPhoto) => ({
+      ...currentPhoto,
+      faceDetection: {
+        ...(currentPhoto.faceDetection ?? getDefaultPhotoFaceDetectionState()),
+        status: "detecting",
+        diagnostics: [],
+        message: "Auto : détection et cadrage du visage en cours.",
+      },
+    }));
+
+    const modelErrorMessage = await ensureFaceModelLoaded();
+
+    if (modelErrorMessage) {
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        faceDetection: {
+          ...(currentPhoto.faceDetection ?? getDefaultPhotoFaceDetectionState()),
+          status: "error",
+          diagnostics: [],
+          message: modelErrorMessage,
+        },
+      }));
+      throw createAutoWorkflowError("crop", "crop", modelErrorMessage);
+    }
+
+    try {
+      const { detectFaceLandmarks } = await import("../vision/face-landmarker");
+      const detectionResult = await detectFaceLandmarks(photo.image);
+      const analysis = analyzeFaceLandmarks(detectionResult.faceLandmarks);
+
+      if (!analysis.selectedFace) {
+        const message = "Aucun visage exploitable n'a été détecté.";
+        updatePhoto(photo.id, (currentPhoto) => ({
+          ...currentPhoto,
+          faceDetection: {
+            ...(currentPhoto.faceDetection ?? getDefaultPhotoFaceDetectionState()),
+            status: "not-found",
+            diagnostics: analysis.diagnostics,
+            message,
+          },
+        }));
+        throw createAutoWorkflowError("crop", "crop", message);
+      }
+
+      const facePoints = createFacePointsFromCandidate(
+        analysis.selectedFace,
+        getPhotoImageSize(photo),
+      );
+
+      if (!hasAllFacePoints(facePoints)) {
+        const message =
+          "Les points visage automatiques sont insuffisants pour cadrer la photo.";
+        updatePhoto(photo.id, (currentPhoto) => ({
+          ...currentPhoto,
+          faceDetection: {
+            ...(currentPhoto.faceDetection ?? getDefaultPhotoFaceDetectionState()),
+            status: "error",
+            diagnostics: analysis.diagnostics,
+            manualPoints: facePoints,
+            showFacePoints: true,
+            message,
+          },
+        }));
+        throw createAutoWorkflowError("crop", "crop", message);
+      }
+
+      const placement = createFacePlacementFromFacePoints(
+        facePoints,
+        getPhotoImageSize(photo),
+      );
+
+      if (!placement.transform) {
+        const message = placement.message || "Impossible de cadrer à partir des points visage.";
+        updatePhoto(photo.id, (currentPhoto) => ({
+          ...currentPhoto,
+          faceDetection: {
+            ...(currentPhoto.faceDetection ?? getDefaultPhotoFaceDetectionState()),
+            status: "error",
+            diagnostics: placement.diagnostics,
+            manualPoints: facePoints,
+            showFacePoints: true,
+            message,
+          },
+        }));
+        throw createAutoWorkflowError("crop", "crop", message);
+      }
+
+      const transform = placement.transform;
+      const diagnostics = dedupeDiagnostics([
+        ...analysis.diagnostics,
+        ...placement.diagnostics,
+      ]);
+      const faceDetection = {
+        ...(photo.faceDetection ?? getDefaultPhotoFaceDetectionState()),
+        status: "detected" as const,
+        manualAssistantEnabled: false,
+        showFacePoints: true,
+        pointEditMode: "none" as const,
+        manualPoints: facePoints,
+        diagnostics,
+        message: "Auto : cadrage visage appliqué.",
+      };
+      const nextPhoto: PhotoItem = {
+        ...photo,
+        editState: {
+          ...photo.editState,
+          transform,
+        },
+        faceDetection,
+      };
+
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        editState: {
+          ...currentPhoto.editState,
+          transform,
+        },
+        faceDetection,
+      }));
+
+      return nextPhoto;
+    } catch (cropError) {
+      if (isAutoWorkflowError(cropError)) {
+        throw cropError;
+      }
+
+      const message =
+        cropError instanceof Error
+          ? cropError.message
+          : "Impossible de détecter et cadrer le visage automatiquement.";
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        faceDetection: {
+          ...(currentPhoto.faceDetection ?? getDefaultPhotoFaceDetectionState()),
+          status: "error",
+          diagnostics: [],
+          message,
+        },
+      }));
+      throw createAutoWorkflowError("crop", "crop", message);
+    }
+  }
+
+  async function runAutoBackgroundStep(photo: PhotoItem): Promise<PhotoItem> {
+    setAppMode("background");
+    setAutoStep("background");
+    setAutoMessage(`Auto en cours : ${getAutoStepLabel("background")}`);
+
+    const backgroundEdit = photo.backgroundEdit ?? getDefaultBackgroundEditState();
+    const backendPreference = backgroundEdit.backendPreference;
+    const modelConfig = createRmbgConfigForModelPath(backgroundEdit.modelPath);
+
+    setBackgroundRemovalStatus("loading");
+    setBackgroundRemovalError("");
+    updatePhoto(photo.id, (currentPhoto) => ({
+      ...currentPhoto,
+      backgroundEdit: {
+        ...(currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState()),
+        message: `Auto : suppression du fond ${getRmbgEngineLabel(modelConfig.engine)} en cours.`,
+      },
+    }));
+
+    try {
+      const diagnostics = await loadBackgroundRemovalModel(
+        backendPreference,
+        modelConfig,
+      );
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        backgroundEdit: {
+          ...(currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState()),
+          engine: diagnostics.engine,
+          modelPath: modelConfig.modelPath,
+          activeBackend: diagnostics.activeBackend,
+          technicalDiagnostics: diagnostics,
+          message:
+            diagnostics.fallbackMessage ??
+            `Modèle ${getRmbgEngineLabel(diagnostics.engine)} chargé localement. Aucune photo n'a été envoyée.`,
+        },
+      }));
+
+      const result = await removeImageBackground(
+        photo.image,
+        backendPreference,
+        modelConfig,
+      );
+      const nextBackgroundEdit = {
+        ...backgroundEdit,
+        engine: modelConfig.engine,
+        modelPath: modelConfig.modelPath,
+        enabled: true,
+        activeBackend: result.diagnostics.activeBackend,
+        mode: "replace" as const,
+        rawMask: result.mask,
+        technicalDiagnostics: result.diagnostics,
+        maskVersion: backgroundEdit.maskVersion + 1,
+        message: result.messages.join(" "),
+      };
+      const nextPhoto: PhotoItem = {
+        ...photo,
+        backgroundEdit: nextBackgroundEdit,
+      };
+
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        backgroundEdit: {
+          ...(currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState()),
+          ...nextBackgroundEdit,
+        },
+      }));
+      setBackgroundRemovalStatus("ready");
+      setBackgroundRemovalError("");
+
+      return nextPhoto;
+    } catch (backgroundError) {
+      const message =
+        backgroundError instanceof Error
+          ? backgroundError.message
+          : getBackgroundRemovalErrorMessage(backgroundError);
+
+      setBackgroundRemovalStatus("error");
+      setBackgroundRemovalError(message);
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        backgroundEdit: {
+          ...(currentPhoto.backgroundEdit ?? getDefaultBackgroundEditState()),
+          ...(hasBackgroundDiagnostics(backgroundError)
+            ? { technicalDiagnostics: backgroundError.diagnostics }
+            : {}),
+          message,
+        },
+      }));
+      throw createAutoWorkflowError("background", "background", message);
+    }
+  }
+
+  function runAutoQualityStep(photo: PhotoItem): PhotoItem {
+    setAppMode("quality");
+    setAutoStep("quality");
+    setAutoMessage(`Auto en cours : ${getAutoStepLabel("quality")}`);
+
+    try {
+      const diagnostics = analyzeRenderedPhotoQuality(photo);
+      const baseQualityEdit = createAutoQualityEdit(diagnostics);
+      const photoWithQuality: PhotoItem = {
+        ...photo,
+        qualityEdit: baseQualityEdit,
+      };
+      const beforeAfter = analyzeRenderedPhotoQualityBeforeAfter(photoWithQuality);
+      const qualityEdit: QualityEditState = {
+        ...baseQualityEdit,
+        diagnostics,
+        beforeCorrections: beforeAfter.beforeCorrections,
+        afterCorrections: beforeAfter.afterCorrections,
+        analysisStatus: beforeAfter.status,
+        analysisScore: beforeAfter.score,
+        analysisMessages: beforeAfter.messages,
+      };
+      const nextPhoto: PhotoItem = {
+        ...photo,
+        qualityEdit,
+      };
+
+      updatePhoto(photo.id, (currentPhoto) => ({
+        ...currentPhoto,
+        qualityEdit,
+      }));
+      setError("");
+
+      return nextPhoto;
+    } catch (qualityError) {
+      const message =
+        qualityError instanceof Error
+          ? qualityError.message
+          : "Impossible d'appliquer l'amélioration qualité automatique.";
+
+      throw createAutoWorkflowError("quality", "quality", message);
     }
   }
 
@@ -1042,23 +1383,6 @@ export function App() {
     });
   }
 
-  function handleResetBackgroundPoints() {
-    updateActivePhoto((photo) => {
-      const backgroundEdit = photo.backgroundEdit ?? getDefaultBackgroundEditState();
-
-      return {
-        ...photo,
-        backgroundEdit: {
-          ...backgroundEdit,
-          manualForegroundPoints: [],
-          manualBackgroundPoints: [],
-          maskVersion: backgroundEdit.maskVersion + 1,
-          message: "Points de correction effacés.",
-        },
-      };
-    });
-  }
-
   function handleResetBackgroundSettings() {
     updateActivePhoto((photo) => {
       const backgroundEdit = photo.backgroundEdit ?? getDefaultBackgroundEditState();
@@ -1181,51 +1505,6 @@ export function App() {
         pointerId: event.pointerId,
         pointKind,
       };
-      return;
-    }
-
-    if (backgroundPointMode !== "none") {
-      event.preventDefault();
-      const rect = event.currentTarget.getBoundingClientRect();
-      const canvasPoint = getCanvasPointFromClientPoint(
-        {
-          x: event.clientX,
-          y: event.clientY,
-        },
-        {
-          x: rect.left,
-          y: rect.top,
-          width: rect.width,
-          height: rect.height,
-        },
-        PHOTO_CANVAS_SIZE,
-      );
-      const sourcePoint = canvasPointToSourceImagePoint(
-        canvasPoint,
-        getPhotoImageSize(activePhoto),
-        PHOTO_CANVAS_SIZE,
-        activePhoto.editState.transform,
-      );
-
-      updatePhoto(activePhotoId, (photo) => {
-        const backgroundEdit = photo.backgroundEdit ?? getDefaultBackgroundEditState();
-        const nextBackgroundEdit = addBackgroundPoint(
-          backgroundEdit,
-          backgroundPointMode,
-          sourcePoint,
-        );
-
-        return {
-          ...photo,
-          backgroundEdit: {
-            ...nextBackgroundEdit,
-            message:
-              backgroundPointMode === "foreground"
-                ? "Point personne ajouté."
-                : "Point fond ajouté.",
-          },
-        };
-      });
       return;
     }
 
@@ -1545,7 +1824,11 @@ export function App() {
         mode={appMode}
         photoCount={photos.length}
         sheetCapacity={sheetCapacity}
+        autoStatus={autoStatus}
+        autoMessage={autoMessage}
+        autoDisabled={!activePhoto || autoStatus === "running"}
         onModeChange={setAppMode}
+        onRunAuto={handleRunAuto}
       />
 
       <div className="app-main-grid">
@@ -1596,7 +1879,6 @@ export function App() {
           editorInteractionMode={editorInteractionMode}
           backgroundRemovalStatus={backgroundRemovalStatus}
           backgroundRemovalError={backgroundRemovalError}
-          backgroundPointMode={backgroundPointMode}
           onGuideVisibilityChange={handleGuideVisibilityChange}
           onGuideOpacityChange={handleGuideOpacityChange}
           onLoadFaceModel={handleLoadFaceModel}
@@ -1609,8 +1891,6 @@ export function App() {
           onDiagnoseBackgroundSession={handleDiagnoseBackgroundSession}
           onRemoveBackground={handleRemoveBackground}
           onBackgroundChange={handleBackgroundChange}
-          onBackgroundPointModeChange={setBackgroundPointMode}
-          onResetBackgroundPoints={handleResetBackgroundPoints}
           onResetBackgroundSettings={handleResetBackgroundSettings}
           onQualityChange={handleQualityChange}
           onAutoQuality={handleAutoQuality}
@@ -1651,16 +1931,15 @@ function getGuideOverlayPoints(
   hoveredFacePointKind: PhotoManualFacePointKind | null,
   draggedFacePointKind: PhotoManualFacePointKind | null,
 ): GuideOverlayPoint[] {
-  return [
-    ...(appMode === "crop"
-      ? getManualFaceGuideOverlayPoints(
-          photo,
-          hoveredFacePointKind,
-          draggedFacePointKind,
-        )
-      : []),
-    ...(appMode === "background" ? getBackgroundGuideOverlayPoints(photo) : []),
-  ];
+  if (appMode !== "crop") {
+    return [];
+  }
+
+  return getManualFaceGuideOverlayPoints(
+    photo,
+    hoveredFacePointKind,
+    draggedFacePointKind,
+  );
 }
 
 function getManualFaceGuideOverlayPoints(
@@ -1703,46 +1982,6 @@ function getManualFaceGuideOverlayPoints(
   });
 }
 
-function getBackgroundGuideOverlayPoints(photo: PhotoItem): GuideOverlayPoint[] {
-  const backgroundEdit = photo.backgroundEdit;
-
-  if (!backgroundEdit) {
-    return [];
-  }
-
-  const imageSize = getPhotoImageSize(photo);
-  const foregroundPoints = backgroundEdit.manualForegroundPoints.map((point) =>
-    buildBackgroundOverlayPoint(photo, imageSize, point, "Personne", "#15803d"),
-  );
-  const backgroundPoints = backgroundEdit.manualBackgroundPoints.map((point) =>
-    buildBackgroundOverlayPoint(photo, imageSize, point, "Fond", "#b91c1c"),
-  );
-
-  return [...foregroundPoints, ...backgroundPoints];
-}
-
-function buildBackgroundOverlayPoint(
-  photo: PhotoItem,
-  imageSize: Size,
-  point: { x: number; y: number },
-  label: string,
-  color: string,
-): GuideOverlayPoint {
-  const canvasPoint = sourceImagePointToCanvasPoint(
-    point,
-    imageSize,
-    PHOTO_CANVAS_SIZE,
-    photo.editState.transform,
-  );
-
-  return {
-    xPx: canvasPoint.x,
-    yPx: canvasPoint.y,
-    label,
-    color,
-  };
-}
-
 function dedupeDiagnostics<TDiagnostic extends { code: string; message: string }>(
   diagnostics: readonly TDiagnostic[],
 ): TDiagnostic[] {
@@ -1758,6 +1997,47 @@ function dedupeDiagnostics<TDiagnostic extends { code: string; message: string }
     seenDiagnostics.add(key);
     return true;
   });
+}
+
+function getAutoStepLabel(step: AutoStep): string {
+  switch (step) {
+    case "crop":
+      return "cadrage";
+    case "background":
+      return "fond";
+    case "quality":
+      return "qualité";
+    case "sheet":
+      return "planche";
+  }
+}
+
+function createAutoWorkflowError(
+  step: AutoStep,
+  mode: AppMode,
+  message: string,
+): AutoWorkflowError {
+  return {
+    kind: "auto-workflow-error",
+    step,
+    mode,
+    message,
+  };
+}
+
+function isAutoWorkflowError(error: unknown): error is AutoWorkflowError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "kind" in error &&
+    (error as { kind?: unknown }).kind === "auto-workflow-error"
+  );
+}
+
+function getUnknownAutoErrorMessage(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : "Impossible de terminer le traitement automatique.";
 }
 
 function createPhotoItemId(): string {

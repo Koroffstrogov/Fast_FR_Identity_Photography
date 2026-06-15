@@ -4,7 +4,7 @@ import { PHOTO_FORMAT } from "../core/photo-format";
 import { PhotoItem } from "../core/photo-project";
 import { BackgroundRemovalStatus } from "../background/background-removal";
 import type { FaceLandmarkerModelStatus } from "../vision/face-landmarker";
-import { BackgroundPanel, BackgroundPointMode } from "./BackgroundPanel";
+import { BackgroundPanel } from "./BackgroundPanel";
 import { FaceDetectionPanel } from "./FaceDetectionPanel";
 import { FaceGuideControl } from "./FaceGuideControl";
 import { EditorInteractionMode } from "./editor-interaction-mode";
@@ -35,12 +35,9 @@ type PhotoEditorProps = {
   onDeleteFacePoints: () => void;
   backgroundRemovalStatus: BackgroundRemovalStatus;
   backgroundRemovalError: string;
-  backgroundPointMode: BackgroundPointMode;
   onLoadBackgroundModel: () => void;
   onRemoveBackground: () => void;
   onBackgroundChange: (partialEdit: Partial<NonNullable<PhotoItem["backgroundEdit"]>>) => void;
-  onBackgroundPointModeChange: (mode: BackgroundPointMode) => void;
-  onResetBackgroundPoints: () => void;
   onResetBackgroundSettings: () => void;
 };
 
@@ -67,12 +64,9 @@ export function PhotoEditor({
   onDeleteFacePoints,
   backgroundRemovalStatus,
   backgroundRemovalError,
-  backgroundPointMode,
   onLoadBackgroundModel,
   onRemoveBackground,
   onBackgroundChange,
-  onBackgroundPointModeChange,
-  onResetBackgroundPoints,
   onResetBackgroundSettings,
 }: PhotoEditorProps) {
   const editState = photo?.editState;
@@ -153,12 +147,9 @@ export function PhotoEditor({
           disabled={!photo}
           removalStatus={backgroundRemovalStatus}
           removalError={backgroundRemovalError}
-          pointMode={backgroundPointMode}
           onLoadModel={onLoadBackgroundModel}
           onRemoveBackground={onRemoveBackground}
           onBackgroundChange={onBackgroundChange}
-          onPointModeChange={onBackgroundPointModeChange}
-          onResetPoints={onResetBackgroundPoints}
           onResetSettings={onResetBackgroundSettings}
         />
 

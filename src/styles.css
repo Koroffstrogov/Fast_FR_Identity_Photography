@@ -1039,12 +1039,34 @@ button {
   align-items: center;
 }
 
+.auto-run-button {
+  min-height: 36px;
+  padding: 0 14px;
+  background: #0f766e;
+  white-space: nowrap;
+}
+
 .topbar-actions p {
   margin: 0;
   color: #4e5a60;
   font-size: 0.9rem;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.topbar-actions .auto-status-message {
+  max-width: 320px;
+  overflow: hidden;
+  color: #31515a;
+  text-overflow: ellipsis;
+}
+
+.topbar-actions .auto-status-error {
+  color: #b91c1c;
+}
+
+.topbar-actions .auto-status-done {
+  color: #15803d;
 }
 
 .app-main-grid {

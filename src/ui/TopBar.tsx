@@ -1,17 +1,28 @@
 import { AppMode, APP_MODES } from "./app-mode";
+import { ButtonIcon } from "./icons";
+
+export type TopBarAutoStatus = "idle" | "running" | "error" | "done";
 
 type TopBarProps = {
   mode: AppMode;
   photoCount: number;
   sheetCapacity: number;
+  autoStatus: TopBarAutoStatus;
+  autoMessage: string;
+  autoDisabled: boolean;
   onModeChange: (mode: AppMode) => void;
+  onRunAuto: () => void;
 };
 
 export function TopBar({
   mode,
   photoCount,
   sheetCapacity,
+  autoStatus,
+  autoMessage,
+  autoDisabled,
   onModeChange,
+  onRunAuto,
 }: TopBarProps) {
   return (
     <header className="app-topbar">
@@ -35,7 +46,26 @@ export function TopBar({
       </nav>
 
       <div className="topbar-actions">
+        <button
+          type="button"
+          className="auto-run-button button-with-icon"
+          onClick={onRunAuto}
+          disabled={autoDisabled}
+          aria-describedby={autoMessage ? "auto-status-message" : undefined}
+        >
+          <ButtonIcon name="sparkles" />
+          Auto
+        </button>
         <p>{photoCount} photos / {sheetCapacity} places</p>
+        {autoMessage && (
+          <p
+            id="auto-status-message"
+            className={`auto-status-message auto-status-${autoStatus}`}
+            role="status"
+          >
+            {autoMessage}
+          </p>
+        )}
       </div>
     </header>
   );

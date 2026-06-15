@@ -16,22 +16,17 @@ import {
   getRmbgModelOptions,
   normalizeRmbgModelPath,
 } from "../background/rmbg-config";
-import { ButtonIcon } from "./icons";
-
-export type BackgroundPointMode = "none" | "foreground" | "background";
+import { ButtonIcon, Icon, IconName } from "./icons";
 
 type BackgroundPanelProps = {
   backgroundEdit: BackgroundEditState | undefined;
   disabled: boolean;
   removalStatus: BackgroundRemovalStatus;
   removalError: string;
-  pointMode: BackgroundPointMode;
   onLoadModel: () => void;
   onDiagnoseSession?: () => void;
   onRemoveBackground: () => void;
   onBackgroundChange: (partialEdit: Partial<BackgroundEditState>) => void;
-  onPointModeChange: (mode: BackgroundPointMode) => void;
-  onResetPoints: () => void;
   onResetSettings: () => void;
 };
 
@@ -46,19 +41,14 @@ export function BackgroundPanel({
   disabled,
   removalStatus,
   removalError,
-  pointMode,
   onLoadModel,
   onDiagnoseSession,
   onRemoveBackground,
   onBackgroundChange,
-  onPointModeChange,
-  onResetPoints,
   onResetSettings,
 }: BackgroundPanelProps) {
   const edit = backgroundEdit ?? getFallbackBackgroundEditState();
   const isBusy = removalStatus === "loading";
-  const pointCount =
-    edit.manualForegroundPoints.length + edit.manualBackgroundPoints.length;
   const diagnostics = edit.technicalDiagnostics;
   const browserOrigin = getBrowserOrigin();
   const selectedModelPath = normalizeRmbgModelPath(
@@ -83,15 +73,6 @@ export function BackgroundPanel({
         <p className="model-status">État modèle : {getRemovalStatusLabel(removalStatus)}</p>
 
         <div className="button-row">
-          <button
-            type="button"
-            className="secondary-button button-with-icon"
-            onClick={onLoadModel}
-            disabled={disabled || isBusy}
-          >
-            <ButtonIcon name="download" />
-            Charger / vérifier le modèle
-          </button>
           <button
             type="button"
             className="button-with-icon"
@@ -133,9 +114,9 @@ export function BackgroundPanel({
         <fieldset className="mode-control">
           <legend>Aperçu fond</legend>
           <div className="segmented-options background-mode-options">
-            {renderModeOption("original", "Original", edit.mode, disabled, onBackgroundChange)}
-            {renderModeOption("replace", "Fond remplacé", edit.mode, disabled, onBackgroundChange)}
-            {renderModeOption("mask-preview", "Masque", edit.mode, disabled, onBackgroundChange)}
+            {renderModeOption("original", "Original", "image", edit.mode, disabled, onBackgroundChange)}
+            {renderModeOption("replace", "Fond remplacé", "background", edit.mode, disabled, onBackgroundChange)}
+            {renderModeOption("mask-preview", "Masque", "eye", edit.mode, disabled, onBackgroundChange)}
           </div>
         </fieldset>
 
@@ -179,66 +160,8 @@ export function BackgroundPanel({
         </div>
       </div>
 
-      <details className="background-advanced">
-        <summary>Options avancées</summary>
-
-        <label className="select-control">
-          <span>Modèle</span>
-          <select
-            aria-label="Modèle RMBG"
-            value={selectedModelPath}
-            onChange={(event) => {
-              const modelPath = event.currentTarget.value;
-
-              onBackgroundChange({
-                engine: "rmbg1.4",
-                modelPath,
-              });
-            }}
-            disabled={disabled || isBusy}
-          >
-            {modelOptions.map((option) => (
-              <option key={option.modelPath} value={option.modelPath}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <p className="manual-note">
-          {selectedModelOption?.description ?? "Modèle RMBG-1.4 local configurable."}
-        </p>
-
-        <label className="select-control">
-          <span>Backend fond</span>
-          <select
-            aria-label="Backend fond"
-            value={edit.backendPreference}
-            onChange={(event) =>
-              onBackgroundChange({
-                backendPreference: event.currentTarget
-                  .value as BackgroundRemovalBackendPreference,
-                activeBackend: "none",
-              })
-            }
-            disabled={disabled || isBusy}
-          >
-            <option value="auto">Auto GPU puis CPU</option>
-            <option value="gpu">GPU WebGPU</option>
-            <option value="cpu">CPU WASM</option>
-          </select>
-        </label>
-
-        {onDiagnoseSession && (
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={onDiagnoseSession}
-            disabled={disabled || isBusy}
-          >
-            Diagnostiquer la session ONNX
-          </button>
-        )}
-
+      <fieldset className="mode-control background-mask-settings">
+        <legend>Réglages du masque</legend>
         <label className="slider-control">
           <span>Seuil du masque</span>
           <output>{edit.threshold.toFixed(2)}</output>
@@ -324,16 +247,79 @@ export function BackgroundPanel({
             <ButtonIcon name="reset" />
             Réinitialiser les réglages fond
           </button>
+        </div>
+      </fieldset>
+
+      <details className="background-advanced">
+        <summary>Options avancées</summary>
+
+        <label className="select-control">
+          <span>Modèle</span>
+          <select
+            aria-label="Modèle RMBG"
+            value={selectedModelPath}
+            onChange={(event) => {
+              const modelPath = event.currentTarget.value;
+
+              onBackgroundChange({
+                engine: "rmbg1.4",
+                modelPath,
+              });
+            }}
+            disabled={disabled || isBusy}
+          >
+            {modelOptions.map((option) => (
+              <option key={option.modelPath} value={option.modelPath}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="manual-note">
+          {selectedModelOption?.description ?? "Modèle RMBG-1.4 local configurable."}
+        </p>
+
+        <label className="select-control">
+          <span>Backend fond</span>
+          <select
+            aria-label="Backend fond"
+            value={edit.backendPreference}
+            onChange={(event) =>
+              onBackgroundChange({
+                backendPreference: event.currentTarget
+                  .value as BackgroundRemovalBackendPreference,
+                activeBackend: "none",
+              })
+            }
+            disabled={disabled || isBusy}
+          >
+            <option value="auto">Auto GPU puis CPU</option>
+            <option value="gpu">GPU WebGPU</option>
+            <option value="cpu">CPU WASM</option>
+          </select>
+        </label>
+
+        <button
+          type="button"
+          className="secondary-button button-with-icon"
+          onClick={onLoadModel}
+          disabled={disabled || isBusy}
+        >
+          <ButtonIcon name="download" />
+          Charger / vérifier le modèle
+        </button>
+
+        {onDiagnoseSession && (
           <button
             type="button"
             className="secondary-button button-with-icon"
-            onClick={() => onBackgroundChange({ enabled: false, mode: "original" })}
-            disabled={disabled}
+            onClick={onDiagnoseSession}
+            disabled={disabled || isBusy}
           >
-            <ButtonIcon name="eyeOff" />
-            Désactiver le remplacement du fond
+            <ButtonIcon name="check" />
+            Diagnostiquer la session ONNX
           </button>
-        </div>
+        )}
 
         <dl className="background-diagnostics" aria-label="Diagnostics techniques fond">
           <div>
@@ -436,41 +422,6 @@ export function BackgroundPanel({
             </div>
           </details>
         )}
-
-        <div className="background-point-controls">
-          <button
-            type="button"
-            className={`${pointMode === "foreground" ? "active-tool-button" : "secondary-button"} button-with-icon`}
-            onClick={() => onPointModeChange(pointMode === "foreground" ? "none" : "foreground")}
-            disabled={disabled}
-          >
-            <ButtonIcon name="point" />
-            Ajouter point personne à garder
-          </button>
-          <button
-            type="button"
-            className={`${pointMode === "background" ? "active-tool-button" : "secondary-button"} button-with-icon`}
-            onClick={() => onPointModeChange(pointMode === "background" ? "none" : "background")}
-            disabled={disabled}
-          >
-            <ButtonIcon name="point" />
-            Ajouter point fond à supprimer
-          </button>
-          <button
-            type="button"
-            className="secondary-button button-with-icon"
-            onClick={onResetPoints}
-            disabled={disabled || pointCount === 0}
-          >
-            <ButtonIcon name="trash" />
-            Effacer les points
-          </button>
-        </div>
-
-        <p className="manual-note">
-          Points : {edit.manualForegroundPoints.length} personne,{" "}
-          {edit.manualBackgroundPoints.length} fond.
-        </p>
       </details>
     </fieldset>
   );
@@ -479,6 +430,7 @@ export function BackgroundPanel({
 function renderModeOption(
   value: BackgroundPreviewMode,
   label: string,
+  iconName: IconName,
   selectedValue: BackgroundPreviewMode,
   disabled: boolean,
   onBackgroundChange: (partialEdit: Partial<BackgroundEditState>) => void,
@@ -497,7 +449,10 @@ function renderModeOption(
         }}
         disabled={disabled}
       />
-      <span>{label}</span>
+      <span className="segmented-option-with-icon">
+        <Icon name={iconName} />
+        {label}
+      </span>
     </label>
   );
 }

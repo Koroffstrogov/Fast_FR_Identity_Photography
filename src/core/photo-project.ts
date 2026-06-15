@@ -193,7 +193,7 @@ export function getDefaultBackgroundEditState(): BackgroundEditState {
     activeBackend: "none",
     replacementColor: DEFAULT_BACKGROUND_REPLACEMENT_COLOR,
     mode: "original",
-    threshold: 0.5,
+    threshold: 0.15,
     featherPx: 6,
     edgeSmoothingPx: 2,
     preserveHair: true,

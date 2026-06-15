@@ -74,6 +74,10 @@ describe("photo project manual face points", () => {
 });
 
 describe("photo project background points", () => {
+  it("uses a low default threshold for progressive RMBG masks", () => {
+    expect(getDefaultBackgroundEditState().threshold).toBe(0.15);
+  });
+
   it("stores foreground and background points independently", () => {
     const backgroundEdit = getDefaultBackgroundEditState();
     const withForegroundPoint = addBackgroundPoint(

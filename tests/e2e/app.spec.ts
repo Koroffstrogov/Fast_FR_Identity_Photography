@@ -15,6 +15,7 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   for (const modeLabel of ["Cadrer", "Fond", "Qualité", "Planche", "Export"]) {
     await expect(page.getByRole("button", { name: modeLabel, exact: true })).toBeVisible();
   }
+  await expect(page.getByRole("button", { name: "Auto", exact: true })).toBeDisabled();
 
   const canvas = page.getByLabel("Aperçu photo 35 par 45 millimètres");
   await expect(canvas).toHaveAttribute("width", "413");
@@ -63,6 +64,7 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   await expect(page.getByText("Détails photo active")).toBeVisible();
   const firstPhotoCard = page.locator(".photo-list-item").first();
   const secondPhotoCard = page.locator(".photo-list-item").nth(1);
+  await expect(secondPhotoCard).toHaveClass(/is-active/);
   const firstCardHeight = await firstPhotoCard.evaluate(
     (node) => node.getBoundingClientRect().height,
   );
@@ -78,7 +80,10 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   expect(listBox).not.toBeNull();
   expect(firstCardBox).not.toBeNull();
   expect(firstCardBox!.y - listBox!.y).toBeLessThan(12);
+  await expect(page.getByRole("button", { name: "Auto", exact: true })).toBeEnabled();
 
+  await page.getByRole("button", { name: "Choisir alice.png" }).click();
+  await expect(firstPhotoCard).toHaveClass(/is-active/);
   await page.getByRole("textbox", { name: "Prénom alice.png", exact: true }).fill("Alice");
   await page.getByRole("textbox", { name: "Nom alice.png", exact: true }).fill("Dupont");
   await page.getByLabel("Usage alice.png").selectOption("college");
@@ -320,6 +325,9 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   await expect(
     backgroundGroup.locator(".model-status").filter({ hasText: "RMBG-1.4 ONNX" }),
   ).toBeVisible();
+  await expect(
+    backgroundGroup.getByRole("button", { name: "Charger / vérifier le modèle" }),
+  ).toBeHidden();
   await expect(backgroundGroup.getByText("Options avancées")).toBeVisible();
   await backgroundGroup.getByText("Options avancées").click();
   await expect(page.getByLabel("Modèle RMBG")).toHaveValue(
@@ -327,31 +335,37 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   );
   await expect(page.getByLabel("Backend fond")).toHaveValue("auto");
   await expect(backgroundGroup.getByRole("button", { name: "Supprimer le fond" })).toBeVisible();
+  await expect(backgroundGroup.getByRole("button", { name: "Réappliquer" })).toBeVisible();
   await backgroundGroup.getByRole("button", { name: "Charger / vérifier le modèle" }).click();
   await expect(page.getByText(/Modèle RMBG-1\.4.*introuvable|Le chemin du modèle renvoie l'application HTML/).first()).toBeVisible();
   await page.getByLabel("Remplacer le fond dans les exports").check();
   await expect(page.getByLabel("Remplacer le fond dans les exports")).toBeChecked();
+  await expect(page.getByRole("group", { name: "Réglages du masque" })).toBeVisible();
+  await expect(page.getByRole("slider", { name: "Seuil du masque" })).toHaveValue("0.15");
+  await expect(page.getByRole("slider", { name: "Contour progressif" })).toBeVisible();
+  await expect(page.getByRole("slider", { name: "Lissage des bords" })).toBeVisible();
+  await page.locator('label:has(input[name="background-preview-mode"][value="original"])').click();
+  await expect(backgroundGroup.getByRole("radio", { name: "Original" })).toBeChecked();
   await page.getByLabel("Couleur de fond").evaluate((input) => {
     const colorInput = input as HTMLInputElement;
     colorInput.value = "#dbeafe";
     colorInput.dispatchEvent(new Event("input", { bubbles: true }));
     colorInput.dispatchEvent(new Event("change", { bubbles: true }));
   });
-  await page
-    .locator('input[name="background-preview-mode"][value="mask-preview"]')
-    .evaluate((input) => {
-      const radio = input as HTMLInputElement;
-      radio.checked = true;
-      radio.dispatchEvent(new Event("input", { bubbles: true }));
-      radio.dispatchEvent(new Event("change", { bubbles: true }));
-    });
-  await page.getByRole("button", { name: "Ajouter point fond à supprimer" }).click();
+  await page.locator('label:has(input[name="background-preview-mode"][value="replace"])').click();
+  await expect(backgroundGroup.getByRole("radio", { name: "Fond remplacé" })).toBeChecked();
+  await page.locator('label:has(input[name="background-preview-mode"][value="mask-preview"])').click();
+  await expect(backgroundGroup.getByRole("radio", { name: "Masque" })).toBeChecked();
+  await expect(
+    backgroundGroup.getByRole("button", { name: "Ajouter point personne à garder" }),
+  ).toHaveCount(0);
+  await expect(
+    backgroundGroup.getByRole("button", { name: "Ajouter point fond à supprimer" }),
+  ).toHaveCount(0);
+  await expect(backgroundGroup.getByRole("button", { name: "Effacer les points" })).toHaveCount(0);
   await canvas.click({ position: { x: 120, y: 120 } });
-  await expect(page.getByText("Point fond ajouté.")).toBeVisible();
-  await expect(page.getByText("Points : 0 personne, 1 fond.")).toBeVisible();
-  await page.getByRole("button", { name: "Ajouter point fond à supprimer" }).click();
-  await page.getByRole("button", { name: "Effacer les points" }).click();
-  await expect(page.getByText("Points : 0 personne, 0 fond.")).toBeVisible();
+  await expect(page.getByText("Point fond ajouté.")).toHaveCount(0);
+  await expect(page.getByText(/Points : \d personne/)).toHaveCount(0);
 
   await page.getByRole("button", { name: "Qualité", exact: true }).click();
   await expect(canvas).toBeVisible();
@@ -447,7 +461,7 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
 });
 
 test("shows a clear background model error and keeps editing usable", async ({ page }) => {
-  await page.route(/\/models\/rmbg(1\.4|2)\/.*\.onnx.*/, async (route) => {
+  await page.route(/\/models\/rmbg1\.4\/.*\.onnx.*/, async (route) => {
     await route.fulfill({
       status: 404,
       contentType: "text/plain",
@@ -465,11 +479,85 @@ test("shows a clear background model error and keeps editing usable", async ({ p
   ]);
 
   await page.getByRole("button", { name: "Fond", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Charger / vérifier le modèle" })).toBeHidden();
+  await page.getByText("Options avancées").click();
   await page.getByRole("button", { name: "Charger / vérifier le modèle" }).click();
-  await expect(page.getByText(/Modèle RMBG-(1\.4|2\.0).*introuvable|Le chemin du modèle renvoie l'application HTML/).first()).toBeVisible();
+  await expect(page.getByText(/Modèle RMBG-1\.4.*introuvable|Le chemin du modèle renvoie l'application HTML/).first()).toBeVisible();
   await expect(page.getByText(/URL testée/).first()).toBeVisible();
   await expect(page.getByRole("slider", { name: "Zoom" })).toBeEnabled();
 
   await page.getByRole("button", { name: "Export", exact: true }).click();
   await expect(page.getByRole("button", { name: "Export JPEG" })).toBeEnabled();
+});
+
+test("newly imported photos become active and reopen crop", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByLabel("Importer depuis le volet gauche").setInputFiles([
+    {
+      name: "first.png",
+      mimeType: "image/png",
+      buffer: SAMPLE_PNG,
+    },
+    {
+      name: "second.png",
+      mimeType: "image/png",
+      buffer: SAMPLE_PNG,
+    },
+  ]);
+
+  const firstPhotoCard = page.locator(".photo-list-item").first();
+  const secondPhotoCard = page.locator(".photo-list-item").nth(1);
+  await expect(secondPhotoCard).toHaveClass(/is-active/);
+
+  await page.getByRole("button", { name: "Choisir first.png" }).click();
+  await expect(firstPhotoCard).toHaveClass(/is-active/);
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+
+  await page.getByLabel("Importer depuis le volet gauche").setInputFiles([
+    {
+      name: "third.png",
+      mimeType: "image/png",
+      buffer: SAMPLE_PNG,
+    },
+  ]);
+
+  await expect(page.getByRole("button", { name: "Cadrer", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.locator(".photo-list-item").nth(2)).toHaveClass(/is-active/);
+  await expect(page.getByRole("heading", { name: "third" })).toBeVisible();
+});
+
+test("auto stops on face model failure and keeps the user on crop", async ({ page }) => {
+  await page.route(/\/models\/mediapipe\/face_landmarker\.task.*/, async (route) => {
+    await route.fulfill({
+      status: 404,
+      contentType: "text/plain",
+      body: "missing face model",
+    });
+  });
+
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Auto", exact: true })).toBeDisabled();
+
+  await page.getByLabel("Importer depuis le volet gauche").setInputFiles([
+    {
+      name: "auto-face-failure.png",
+      mimeType: "image/png",
+      buffer: SAMPLE_PNG,
+    },
+  ]);
+
+  await expect(page.getByRole("button", { name: "Auto", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Auto", exact: true }).click();
+
+  await expect(page.getByRole("button", { name: "Cadrer", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByText(/Auto interrompu/).first()).toBeVisible();
+  await expect(page.getByText(/Impossible de charger le modèle visage local/).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Auto", exact: true })).toBeEnabled();
 });

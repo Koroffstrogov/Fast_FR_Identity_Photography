@@ -5,7 +5,7 @@ import { SheetComposition } from "../core/sheet-items";
 import { QualityEditState } from "../quality/quality-state";
 import { BackgroundRemovalStatus } from "../background/background-removal";
 import type { FaceLandmarkerModelStatus } from "../vision/face-landmarker";
-import { BackgroundPanel, BackgroundPointMode } from "./BackgroundPanel";
+import { BackgroundPanel } from "./BackgroundPanel";
 import { ExportPanel } from "./ExportPanel";
 import { FaceDetectionPanel } from "./FaceDetectionPanel";
 import { FaceGuideControl } from "./FaceGuideControl";
@@ -26,7 +26,6 @@ type RightInspectorProps = {
   editorInteractionMode: EditorInteractionMode;
   backgroundRemovalStatus: BackgroundRemovalStatus;
   backgroundRemovalError: string;
-  backgroundPointMode: BackgroundPointMode;
   onGuideVisibilityChange: (showGuide: boolean) => void;
   onGuideOpacityChange: (opacity: number) => void;
   onLoadFaceModel: () => void;
@@ -42,8 +41,6 @@ type RightInspectorProps = {
   onDiagnoseBackgroundSession: () => void;
   onRemoveBackground: () => void;
   onBackgroundChange: (partialEdit: Partial<NonNullable<PhotoItem["backgroundEdit"]>>) => void;
-  onBackgroundPointModeChange: (mode: BackgroundPointMode) => void;
-  onResetBackgroundPoints: () => void;
   onResetBackgroundSettings: () => void;
   onQualityChange: (partialEdit: Partial<QualityEditState>) => void;
   onAutoQuality: () => void;
@@ -70,7 +67,6 @@ export function RightInspector({
   editorInteractionMode,
   backgroundRemovalStatus,
   backgroundRemovalError,
-  backgroundPointMode,
   onGuideVisibilityChange,
   onGuideOpacityChange,
   onLoadFaceModel,
@@ -83,8 +79,6 @@ export function RightInspector({
   onDiagnoseBackgroundSession,
   onRemoveBackground,
   onBackgroundChange,
-  onBackgroundPointModeChange,
-  onResetBackgroundPoints,
   onResetBackgroundSettings,
   onQualityChange,
   onAutoQuality,
@@ -133,13 +127,10 @@ export function RightInspector({
           disabled={!photo}
           removalStatus={backgroundRemovalStatus}
           removalError={backgroundRemovalError}
-          pointMode={backgroundPointMode}
           onLoadModel={onLoadBackgroundModel}
           onDiagnoseSession={onDiagnoseBackgroundSession}
           onRemoveBackground={onRemoveBackground}
           onBackgroundChange={onBackgroundChange}
-          onPointModeChange={onBackgroundPointModeChange}
-          onResetPoints={onResetBackgroundPoints}
           onResetSettings={onResetBackgroundSettings}
         />
       )}
