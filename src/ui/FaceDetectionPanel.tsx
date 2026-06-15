@@ -5,7 +5,6 @@ import {
   hasAllFacePoints,
 } from "../core/photo-project";
 import {
-  EDITOR_INTERACTION_MODE_LABELS,
   EditorInteractionMode,
   getNextFacePointStepLabel,
 } from "./editor-interaction-mode";
@@ -54,17 +53,6 @@ export function FaceDetectionPanel({
   const nextPointStep = getNextFacePointStepLabel(
     getNextManualFacePointKind(manualPoints),
   );
-  const modeIconNames: Record<EditorInteractionMode, "move" | "point" | "crop"> = {
-    "move-photo": "move",
-    "place-face-points": "point",
-    "move-face-points": "crop",
-  };
-
-  function handleInteractionModeSelection(mode: EditorInteractionMode) {
-    onInteractionModeChange(mode, {
-      resetFacePoints: mode === "place-face-points",
-    });
-  }
 
   return (
     <fieldset className="face-detection-panel">
@@ -96,47 +84,6 @@ export function FaceDetectionPanel({
       {detectionState?.message && detectionState.message !== modelError && (
         <p className="detection-message">{detectionState.message}</p>
       )}
-
-      <fieldset className="mode-control">
-        <legend>Interaction sur l'image</legend>
-        <div className="segmented-options interaction-mode-options">
-          {(
-            [
-              "move-photo",
-              "place-face-points",
-              "move-face-points",
-            ] as const
-          ).map((mode) => (
-            <label key={mode}>
-              <input
-                type="radio"
-                name="editor-interaction-mode"
-                value={mode}
-                checked={interactionMode === mode}
-                onClick={() => {
-                  if (interactionMode === mode && mode === "place-face-points") {
-                    handleInteractionModeSelection(mode);
-                  }
-                }}
-                onChange={() => {
-                  if (interactionMode !== mode) {
-                    handleInteractionModeSelection(mode);
-                  }
-                }}
-                disabled={
-                  !photo ||
-                  (mode === "move-face-points" &&
-                    (!showFacePoints || facePointCount === 0))
-                }
-              />
-              <span className="segmented-option-with-icon">
-                <Icon name={modeIconNames[mode]} />
-                {EDITOR_INTERACTION_MODE_LABELS[mode]}
-              </span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
 
       <fieldset className="mode-control">
         <legend>Affichage points</legend>

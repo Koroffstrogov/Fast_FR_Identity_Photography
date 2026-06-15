@@ -1865,6 +1865,7 @@ export function App() {
           onPointerMove={handlePointerMove}
           onPointerEnd={handlePointerEnd}
           onPointerLeave={handlePointerLeave}
+          onInteractionModeChange={handleEditorInteractionModeChange}
         />
 
         <RightInspector

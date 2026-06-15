@@ -1214,6 +1214,38 @@ button {
   box-shadow: 0 8px 24px rgb(23 32 38 / 14%);
 }
 
+.canvas-interaction-toolbar {
+  display: flex;
+  width: min(470px, 42vw, 58vh);
+  max-width: 100%;
+  gap: 6px;
+  justify-content: center;
+}
+
+.canvas-interaction-button {
+  min-height: 32px;
+  border: 1px solid #c8d2ce;
+  border-radius: 8px;
+  padding: 0 10px;
+  color: #253137;
+  background: #ffffff;
+  box-shadow: none;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.canvas-interaction-button[aria-pressed="true"] {
+  border-color: #164e63;
+  color: #ffffff;
+  background: #164e63;
+}
+
+.canvas-interaction-button:disabled {
+  border-color: #d9dee2;
+  color: #7d888d;
+  background: #eef2f1;
+}
+
 .interaction-mode-badge {
   width: min(470px, 42vw, 58vh);
   max-width: 100%;

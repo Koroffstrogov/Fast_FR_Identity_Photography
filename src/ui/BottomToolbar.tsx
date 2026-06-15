@@ -201,7 +201,7 @@ function getToolbarInteractionMessage(
   }
 
   if (editorInteractionMode === "move-face-points") {
-    return "Mode déplacement points actif - la photo est verrouillée.";
+    return "Mode ajustement points actif - la photo est verrouillée.";
   }
 
   if (editorInteractionMode === "place-face-points") {

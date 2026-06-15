@@ -42,6 +42,35 @@ describe("face points", () => {
     expect(points[3]).toMatchObject({ xPx: 500, yPx: 64 });
   });
 
+  it("normalizes automatic eyes from the screen point of view", () => {
+    const points = createFacePointsFromCandidate(
+      {
+        index: 0,
+        landmarks: [],
+        leftEye: { x: 0.65, y: 0.4 },
+        rightEye: { x: 0.35, y: 0.42 },
+        eyesCenter: { x: 0.5, y: 0.41 },
+        chin: { x: 0.5, y: 0.78 },
+        estimatedSkullTop: { x: 0.5, y: 0.08 },
+        bounds: {
+          minX: 0.3,
+          minY: 0.08,
+          maxX: 0.7,
+          maxY: 0.8,
+          width: 0.4,
+          height: 0.72,
+          area: 0.288,
+        },
+        rollDegrees: 0,
+        diagnostics: [],
+      },
+      { width: 1000, height: 800 },
+    );
+
+    expect(points[0]).toMatchObject({ kind: "leftEye", xPx: 350, yPx: 336 });
+    expect(points[1]).toMatchObject({ kind: "rightEye", xPx: 650, yPx: 320 });
+  });
+
   it("selects the nearest visible face point inside the hit radius", () => {
     const pointKind = findNearestFacePointKind(
       [

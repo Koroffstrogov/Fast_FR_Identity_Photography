@@ -12,14 +12,19 @@ export function createFacePointsFromCandidate(
   face: FaceCandidate,
   imageSize: Size,
 ): PhotoManualFacePoint[] {
+  const [screenLeftEye, screenRightEye] =
+    face.leftEye.x <= face.rightEye.x
+      ? [face.leftEye, face.rightEye]
+      : [face.rightEye, face.leftEye];
+
   return [
     {
       kind: "leftEye",
-      ...normalizedToPhotoPoint(face.leftEye, imageSize),
+      ...normalizedToPhotoPoint(screenLeftEye, imageSize),
     },
     {
       kind: "rightEye",
-      ...normalizedToPhotoPoint(face.rightEye, imageSize),
+      ...normalizedToPhotoPoint(screenRightEye, imageSize),
     },
     {
       kind: "chin",

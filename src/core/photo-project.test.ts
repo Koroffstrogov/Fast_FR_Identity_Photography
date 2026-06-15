@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   addBackgroundPoint,
   getDefaultBackgroundEditState,
+  getManualFacePointLabel,
   getNextManualFacePointKind,
   hasAllFacePoints,
   resetBackgroundPoints,
@@ -60,6 +61,11 @@ describe("photo project manual face points", () => {
         { kind: "chin", xPx: 30, yPx: 40 },
       ]),
     ).toBe(true);
+  });
+
+  it("labels eye points from the screen point of view", () => {
+    expect(getManualFacePointLabel("leftEye")).toBe("Œil G écran");
+    expect(getManualFacePointLabel("rightEye")).toBe("Œil D écran");
   });
 
   it("keeps legacy eyes center points compatible when skull top is present", () => {

@@ -137,14 +137,18 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   await page.getByRole("button", { name: "Choisir bob.png" }).click();
   await expect(page.getByRole("heading", { name: "Éléa Sport" })).toBeVisible();
   await expect(page.getByLabel("Guide visage Renforcé")).toBeChecked();
-  const interactionGroup = page.getByRole("group", { name: "Interaction sur l'image" });
+  const interactionToolbar = page.getByLabel("Modes de cadrage");
   const facePointsVisibilityGroup = page.getByRole("group", {
     name: "Affichage points",
   });
-  await expect(interactionGroup).toBeVisible();
+  await expect(page.getByRole("group", { name: "Interaction sur l'image" })).toHaveCount(0);
+  await expect(interactionToolbar).toBeVisible();
   await expect(
-    interactionGroup.getByRole("radio", { name: "Déplacer photo", exact: true }),
-  ).toBeChecked();
+    interactionToolbar.getByRole("button", { name: "Déplacer", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    interactionToolbar.getByRole("button", { name: "Ajuster points", exact: true }),
+  ).toBeDisabled();
   const movePhotoBadge = page
     .getByRole("status")
     .filter({ hasText: "Déplacer photo - glissez l'image, utilisez la molette pour zoomer." });
@@ -215,41 +219,37 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
     await canvas.evaluate((node) => (node as HTMLCanvasElement).toDataURL("image/jpeg")),
   ).toBe(photoDataBeforeGuideToggle);
 
-  await page
-    .locator('label:has(input[name="editor-interaction-mode"][value="place-face-points"])')
-    .click();
+  await interactionToolbar.getByRole("button", { name: "Placer points", exact: true }).click();
   await expect(
-    interactionGroup.getByRole("radio", { name: "Placer points", exact: true }),
-  ).toBeChecked();
+    interactionToolbar.getByRole("button", { name: "Placer points", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(
     page
       .getByRole("status")
-      .filter({ hasText: "Placer points - cliquez : œil gauche, œil droit, menton, sommet du crâne." }),
+      .filter({ hasText: "Placer points - cliquez : œil gauche à l'écran, œil droit à l'écran, menton, sommet du crâne." }),
   ).toBeVisible();
   await expect(canvas).toHaveClass(/interaction-place-face-points/);
   expect(await canvas.evaluate((node) => getComputedStyle(node).cursor)).toBe("crosshair");
   await expect(page.getByText("Statut : 0/4 points placés")).toBeVisible();
   await expect(
-    page.getByText("0/4 point(s) visage placé(s). Prochain point : œil gauche."),
+    page.getByText("0/4 point(s) visage placé(s). Prochain point : œil gauche à l'écran."),
   ).toBeVisible();
   await canvas.click({ position: { x: 175, y: 230 } });
   await expect(
-    page.getByText("1/4 point(s) visage placé(s). Prochain point : œil droit."),
+    page.getByText("1/4 point(s) visage placé(s). Prochain point : œil droit à l'écran."),
   ).toBeVisible();
   await canvas.click({ position: { x: 238, y: 250 } });
   await expect(
     page.getByText("2/4 point(s) visage placé(s). Prochain point : menton."),
   ).toBeVisible();
-  await page
-    .locator('label:has(input[name="editor-interaction-mode"][value="place-face-points"])')
-    .click();
+  await interactionToolbar.getByRole("button", { name: "Placer points", exact: true }).click();
   await expect(page.getByText("Statut : 0/4 points placés")).toBeVisible();
   await expect(
-    page.getByText("0/4 point(s) visage placé(s). Prochain point : œil gauche."),
+    page.getByText("0/4 point(s) visage placé(s). Prochain point : œil gauche à l'écran."),
   ).toBeVisible();
   await canvas.click({ position: { x: 175, y: 230 } });
   await expect(
-    page.getByText("1/4 point(s) visage placé(s). Prochain point : œil droit."),
+    page.getByText("1/4 point(s) visage placé(s). Prochain point : œil droit à l'écran."),
   ).toBeVisible();
   await canvas.click({ position: { x: 238, y: 250 } });
   await expect(
@@ -268,17 +268,20 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   await expect(
     page.getByRole("button", { name: "Cadrer à partir des points" }),
   ).toBeEnabled();
+  await expect(
+    interactionToolbar.getByRole("button", { name: "Ajuster points", exact: true }),
+  ).toBeEnabled();
   await page
-    .locator('label:has(input[name="editor-interaction-mode"][value="move-face-points"])')
+    .getByRole("button", { name: "Ajuster points", exact: true })
     .click();
   await expect(
-    interactionGroup.getByRole("radio", { name: "Déplacer points", exact: true }),
-  ).toBeChecked();
+    interactionToolbar.getByRole("button", { name: "Ajuster points", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(facePointsVisibilityGroup.getByLabel("Visibles")).toBeChecked();
   await expect(
     page
       .getByRole("status")
-      .filter({ hasText: "Déplacer points - glissez un point pour l'ajuster. Échap pour quitter." }),
+      .filter({ hasText: "Ajuster points - glissez un point pour l'ajuster. Échap pour quitter." }),
   ).toBeVisible();
   await expect(canvas).toHaveClass(/interaction-move-face-points/);
   const photoDataBeforePointModeDrag = await canvas.evaluate((node) =>
@@ -295,8 +298,8 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   ).toBe(photoDataBeforePointModeDrag);
   await page.keyboard.press("Escape");
   await expect(
-    interactionGroup.getByRole("radio", { name: "Déplacer photo", exact: true }),
-  ).toBeChecked();
+    interactionToolbar.getByRole("button", { name: "Déplacer", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(
     page
       .getByRole("status")

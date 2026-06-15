@@ -13,15 +13,15 @@ export type EditorInteractionMode =
 export const EDITOR_INTERACTION_MODE_LABELS: Record<EditorInteractionMode, string> = {
   "move-photo": "Déplacer photo",
   "place-face-points": "Placer points",
-  "move-face-points": "Déplacer points",
+  "move-face-points": "Ajuster points",
 };
 
 export const EDITOR_INTERACTION_MODE_MESSAGES: Record<EditorInteractionMode, string> = {
   "move-photo": "Déplacer photo - glissez l'image, utilisez la molette pour zoomer.",
   "place-face-points":
-    "Placer points - cliquez : œil gauche, œil droit, menton, sommet du crâne.",
+    "Placer points - cliquez : œil gauche à l'écran, œil droit à l'écran, menton, sommet du crâne.",
   "move-face-points":
-    "Déplacer points - glissez un point pour l'ajuster. Échap pour quitter.",
+    "Ajuster points - glissez un point pour l'ajuster. Échap pour quitter.",
 };
 
 export function canUseEditorInteractionMode(
@@ -75,9 +75,9 @@ export function getNextFacePointStepLabel(
 ): string {
   switch (nextPointKind) {
     case "leftEye":
-      return "Prochain point : œil gauche.";
+      return "Prochain point : œil gauche à l'écran.";
     case "rightEye":
-      return "Prochain point : œil droit.";
+      return "Prochain point : œil droit à l'écran.";
     case "chin":
       return "Prochain point : menton.";
     case "skullTop":

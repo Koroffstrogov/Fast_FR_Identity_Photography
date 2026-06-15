@@ -14,7 +14,7 @@ describe("editor interaction mode", () => {
   it("exposes user-facing labels and workspace messages", () => {
     expect(EDITOR_INTERACTION_MODE_LABELS["move-photo"]).toBe("Déplacer photo");
     expect(EDITOR_INTERACTION_MODE_LABELS["place-face-points"]).toBe("Placer points");
-    expect(EDITOR_INTERACTION_MODE_LABELS["move-face-points"]).toBe("Déplacer points");
+    expect(EDITOR_INTERACTION_MODE_LABELS["move-face-points"]).toBe("Ajuster points");
     expect(EDITOR_INTERACTION_MODE_MESSAGES["move-face-points"]).toContain(
       "Échap",
     );
@@ -60,15 +60,15 @@ describe("editor interaction mode", () => {
   });
 
   it("describes the next face point placement step", () => {
-    expect(getNextFacePointStepLabel("leftEye")).toContain("œil gauche");
-    expect(getNextFacePointStepLabel("rightEye")).toContain("œil droit");
+    expect(getNextFacePointStepLabel("leftEye")).toContain("œil gauche à l'écran");
+    expect(getNextFacePointStepLabel("rightEye")).toContain("œil droit à l'écran");
     expect(getNextFacePointStepLabel("chin")).toContain("menton");
     expect(getNextFacePointStepLabel("skullTop")).toContain("sommet");
   });
 
   it("formats the reset placement message from an empty point list", () => {
     expect(getFacePointPlacementMessage([])).toBe(
-      "0/4 point(s) visage placé(s). Prochain point : œil gauche.",
+      "0/4 point(s) visage placé(s). Prochain point : œil gauche à l'écran.",
     );
   });
 });

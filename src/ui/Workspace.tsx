@@ -5,6 +5,7 @@ import { SheetComposition } from "../core/sheet-items";
 import { PHOTO_FORMAT } from "../core/photo-format";
 import { AppMode, getAppModeLabel } from "./app-mode";
 import {
+  canUseEditorInteractionMode,
   EDITOR_INTERACTION_MODE_MESSAGES,
   EditorInteractionMode,
 } from "./editor-interaction-mode";
@@ -26,6 +27,10 @@ type WorkspaceProps = {
   onPointerMove: PointerEventHandler<HTMLCanvasElement>;
   onPointerEnd: PointerEventHandler<HTMLCanvasElement>;
   onPointerLeave: PointerEventHandler<HTMLCanvasElement>;
+  onInteractionModeChange: (
+    mode: EditorInteractionMode,
+    options?: { resetFacePoints?: boolean },
+  ) => void;
 };
 
 export function Workspace({
@@ -43,6 +48,7 @@ export function Workspace({
   onPointerMove,
   onPointerEnd,
   onPointerLeave,
+  onInteractionModeChange,
 }: WorkspaceProps) {
   if (mode === "sheet") {
     return (
@@ -91,6 +97,7 @@ export function Workspace({
   ]
     .filter(Boolean)
     .join(" ");
+  const interactionControls = getWorkspaceInteractionControls();
 
   return (
     <main className="workspace-panel" aria-label="Espace de travail">
@@ -111,6 +118,33 @@ export function Workspace({
             {photo && mode === "crop" && (
               <div className="interaction-mode-badge" role="status">
                 {EDITOR_INTERACTION_MODE_MESSAGES[interactionMode]}
+              </div>
+            )}
+            {mode === "crop" && (
+              <div className="canvas-interaction-toolbar" aria-label="Modes de cadrage">
+                {interactionControls.map((control) => {
+                  const disabled =
+                    !photo ||
+                    !canUseEditorInteractionMode(control.mode, photo);
+
+                  return (
+                    <button
+                      key={control.mode}
+                      type="button"
+                      className="canvas-interaction-button button-with-icon"
+                      aria-pressed={interactionMode === control.mode}
+                      onClick={() =>
+                        onInteractionModeChange(control.mode, {
+                          resetFacePoints: control.mode === "place-face-points",
+                        })
+                      }
+                      disabled={disabled}
+                    >
+                      <ButtonIcon name={control.iconName} />
+                      {control.label}
+                    </button>
+                  );
+                })}
               </div>
             )}
             <div className="canvas-panel photo-stage-canvas-panel">
@@ -144,4 +178,16 @@ export function Workspace({
       </section>
     </main>
   );
+}
+
+function getWorkspaceInteractionControls(): Array<{
+  mode: EditorInteractionMode;
+  label: string;
+  iconName: "move" | "point" | "crop";
+}> {
+  return [
+    { mode: "move-photo", label: "Déplacer", iconName: "move" },
+    { mode: "place-face-points", label: "Placer points", iconName: "point" },
+    { mode: "move-face-points", label: "Ajuster points", iconName: "crop" },
+  ];
 }

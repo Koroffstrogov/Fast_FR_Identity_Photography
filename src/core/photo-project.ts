@@ -327,9 +327,9 @@ export function hasAllFacePoints(
 export function getManualFacePointLabel(kind: PhotoManualFacePointKind): string {
   switch (kind) {
     case "leftEye":
-      return "Œil G";
+      return "Œil G écran";
     case "rightEye":
-      return "Œil D";
+      return "Œil D écran";
     case "eyesCenter":
       return "Yeux";
     case "chin":
