@@ -7,10 +7,40 @@ const LOCAL_APP_DIRECTORY = "PhotoID";
 const MANIFEST_FILE_NAME = "manifest.json";
 const LOCAL_MANIFEST_FILE_NAME = ".photoid-release.json";
 
+// The launcher copies another Electron app, including resources/app.asar.
+// Electron patches fs to treat .asar paths as virtual archives; that breaks fs.cp
+// when the destination archive is still being written. Treat .asar as plain files.
+process.noAsar = true;
+
 let statusWindow = null;
 
-function getLauncherRoot() {
-  return process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath);
+function getLauncherRootCandidates() {
+  return [
+    process.env.PORTABLE_EXECUTABLE_DIR,
+    process.env.PORTABLE_EXECUTABLE_FILE
+      ? path.dirname(process.env.PORTABLE_EXECUTABLE_FILE)
+      : undefined,
+    path.dirname(process.execPath),
+    process.cwd(),
+  ].filter(Boolean);
+}
+
+async function findLauncherRoot() {
+  const checkedPaths = [];
+
+  for (const candidate of getLauncherRootCandidates()) {
+    const manifestPath = path.join(candidate, MANIFEST_FILE_NAME);
+    checkedPaths.push(manifestPath);
+
+    if (await pathExists(manifestPath)) {
+      await appendLauncherLog(`Manifest trouve : ${manifestPath}`);
+      return candidate;
+    }
+  }
+
+  throw new Error(
+    `manifest.json introuvable. Emplacements testes : ${checkedPaths.join(" ; ")}`,
+  );
 }
 
 function getLocalRoot() {
@@ -21,6 +51,26 @@ function getLocalRoot() {
   }
 
   return path.join(localAppData, LOCAL_APP_DIRECTORY);
+}
+
+function getLauncherLogPath() {
+  const localAppData = process.env.LOCALAPPDATA;
+
+  if (localAppData) {
+    return path.join(localAppData, LOCAL_APP_DIRECTORY, "launcher.log");
+  }
+
+  return path.join(app.getPath("temp"), "PhotoID-launcher.log");
+}
+
+async function appendLauncherLog(message) {
+  try {
+    const logPath = getLauncherLogPath();
+    await fs.mkdir(path.dirname(logPath), { recursive: true });
+    await fs.appendFile(logPath, `[${new Date().toISOString()}] ${message}\n`, "utf8");
+  } catch {
+    // Logging must never block launch.
+  }
 }
 
 async function readManifest(sourceRoot) {
@@ -143,6 +193,9 @@ async function ensureLocalRelease(sourceRoot, manifest) {
   const localExecutablePath = path.join(localReleasePath, manifest.executable);
   const localManifestPath = path.join(localReleasePath, LOCAL_MANIFEST_FILE_NAME);
 
+  await appendLauncherLog(`Source release : ${sourceReleasePath}`);
+  await appendLauncherLog(`Release locale : ${localReleasePath}`);
+
   if (
     (await pathExists(localExecutablePath)) &&
     (await isLocalManifestCurrent(localManifestPath, manifest))
@@ -156,9 +209,11 @@ async function ensureLocalRelease(sourceRoot, manifest) {
 
   await setStatus("Copie des modèles…");
   await fs.mkdir(getLocalRoot(), { recursive: true });
+  await removeStaleTempReleases(manifest.version);
 
   const tempReleasePath = `${localReleasePath}.tmp-${process.pid}`;
   await fs.rm(tempReleasePath, { recursive: true, force: true });
+  await appendLauncherLog(`Copie vers : ${tempReleasePath}`);
   await fs.cp(sourceReleasePath, tempReleasePath, {
     recursive: true,
     force: true,
@@ -173,6 +228,26 @@ async function ensureLocalRelease(sourceRoot, manifest) {
   );
 
   return localExecutablePath;
+}
+
+async function removeStaleTempReleases(version) {
+  const localRoot = getLocalRoot();
+  const tempPrefix = `${version}.tmp-`;
+
+  try {
+    const entries = await fs.readdir(localRoot, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !entry.name.startsWith(tempPrefix)) {
+        continue;
+      }
+
+      await appendLauncherLog(`Nettoyage dossier temporaire : ${entry.name}`);
+      await fs.rm(path.join(localRoot, entry.name), { recursive: true, force: true });
+    }
+  } catch {
+    // Temp cleanup is best effort; the current copy attempt still gives the real error.
+  }
 }
 
 async function isLocalManifestCurrent(localManifestPath, sourceManifest) {
@@ -202,7 +277,7 @@ async function runLauncher() {
   await createStatusWindow();
   await setStatus("Préparation de PhotoID…");
 
-  const sourceRoot = getLauncherRoot();
+  const sourceRoot = await findLauncherRoot();
   const manifest = await readManifest(sourceRoot);
   const localExecutablePath = await ensureLocalRelease(sourceRoot, manifest);
 
@@ -212,11 +287,18 @@ async function runLauncher() {
 }
 
 app.whenReady().then(() => {
-  runLauncher().catch(async () => {
-    const message =
-      "Impossible de copier l'application localement. Vérifiez l'accès au NAS.";
+  runLauncher().catch(async (error) => {
+    const detail = formatLauncherError(error);
+    const message = [
+      "Impossible de copier l'application localement. Vérifiez l'accès au NAS.",
+      detail ? `Détail : ${detail}` : "",
+      `Journal : ${getLauncherLogPath()}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
 
     await setStatus(message);
+    await appendLauncherLog(`ERREUR : ${error?.stack ?? String(error)}`);
     dialog.showErrorBox("PhotoID", message);
   });
 });
@@ -224,3 +306,15 @@ app.whenReady().then(() => {
 app.on("window-all-closed", () => {
   app.quit();
 });
+
+function formatLauncherError(error) {
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+
+  if ("code" in error && error.code) {
+    return `${error.code} - ${error.message}`;
+  }
+
+  return error.message;
+}

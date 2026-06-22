@@ -220,6 +220,12 @@ release dans `%LOCALAPPDATA%\PhotoID\<version>\`, puis lance l'application depui
 le disque local. Cela evite d'executer Electron, les assets ORT et les modeles IA
 directement depuis le NAS.
 
+En cas d'echec du launcher, consulter :
+
+```text
+%LOCALAPPDATA%\PhotoID\launcher.log
+```
+
 Commandes disponibles :
 
 ```powershell
