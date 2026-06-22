@@ -4,6 +4,7 @@ type IconProps = {
 };
 
 export type IconName =
+  | "arrowRight"
   | "background"
   | "check"
   | "crop"
@@ -49,6 +50,13 @@ export function ButtonIcon({ name }: { name: IconName }) {
 
 function renderIconPath(name: IconName) {
   switch (name) {
+    case "arrowRight":
+      return (
+        <>
+          <path d="M5 12h14" />
+          <path d="m13 6 6 6-6 6" />
+        </>
+      );
     case "background":
       return (
         <>

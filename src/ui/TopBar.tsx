@@ -10,6 +10,7 @@ type TopBarProps = {
   autoStatus: TopBarAutoStatus;
   autoMessage: string;
   autoDisabled: boolean;
+  isAutoReady: boolean;
   onModeChange: (mode: AppMode) => void;
   onRunAuto: () => void;
 };
@@ -21,6 +22,7 @@ export function TopBar({
   autoStatus,
   autoMessage,
   autoDisabled,
+  isAutoReady,
   onModeChange,
   onRunAuto,
 }: TopBarProps) {
@@ -31,31 +33,44 @@ export function TopBar({
         <span>Traitement local</span>
       </div>
 
-      <nav className="mode-nav" aria-label="Modes">
-        {APP_MODES.map((appMode) => (
+      <div className="topbar-center">
+        <div className="topbar-flow-actions" aria-label="Démarrage et modes">
           <button
-            key={appMode.id}
             type="button"
-            className={mode === appMode.id ? "mode-nav-button is-active" : "mode-nav-button"}
-            aria-pressed={mode === appMode.id}
-            onClick={() => onModeChange(appMode.id)}
+            className={
+              isAutoReady
+                ? "auto-flow-button button-with-icon is-ready"
+                : "auto-flow-button button-with-icon"
+            }
+            onClick={onRunAuto}
+            disabled={autoDisabled}
+            aria-describedby={autoMessage ? "auto-status-message" : undefined}
           >
-            {appMode.label}
+            <ButtonIcon name="sparkles" />
+            <strong>Génération automatique</strong>
           </button>
-        ))}
-      </nav>
+
+          <span className="topbar-flow-separator" aria-hidden="true">
+            ou
+          </span>
+
+          <nav className="mode-nav" aria-label="Modes">
+            {APP_MODES.map((appMode) => (
+              <button
+                key={appMode.id}
+                type="button"
+                className={mode === appMode.id ? "mode-nav-button is-active" : "mode-nav-button"}
+                aria-pressed={mode === appMode.id}
+                onClick={() => onModeChange(appMode.id)}
+              >
+                {appMode.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </div>
 
       <div className="topbar-actions">
-        <button
-          type="button"
-          className="auto-run-button button-with-icon"
-          onClick={onRunAuto}
-          disabled={autoDisabled}
-          aria-describedby={autoMessage ? "auto-status-message" : undefined}
-        >
-          <ButtonIcon name="sparkles" />
-          Auto
-        </button>
         <p>{photoCount} photos / {sheetCapacity} places</p>
         {autoMessage && (
           <p

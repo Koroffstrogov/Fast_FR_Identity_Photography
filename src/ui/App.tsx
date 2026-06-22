@@ -145,6 +145,7 @@ export function App() {
   const [autoStatus, setAutoStatus] = useState<AutoStatus>("idle");
   const [autoStep, setAutoStep] = useState<AutoStep | null>(null);
   const [autoMessage, setAutoMessage] = useState("");
+  const [isAutoReadyHighlighted, setIsAutoReadyHighlighted] = useState(false);
   const [editorInteractionMode, setEditorInteractionMode] =
     useState<EditorInteractionMode>("move-photo");
   const [hoveredFacePointKind, setHoveredFacePointKind] =
@@ -165,6 +166,18 @@ export function App() {
     () => buildUniquePhotoFileNames(photos, fileNamingTemplate),
     [fileNamingTemplate, photos],
   );
+
+  useEffect(() => {
+    if (!isAutoReadyHighlighted) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIsAutoReadyHighlighted(false);
+    }, 4200);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isAutoReadyHighlighted]);
 
   useEffect(() => {
     const photoCanvas = photoCanvasRef.current;
@@ -361,6 +374,7 @@ export function App() {
       setAutoStatus("idle");
       setAutoStep(null);
       setAutoMessage("");
+      setIsAutoReadyHighlighted(true);
     }
 
     setImportSummary(summary);
@@ -1827,6 +1841,7 @@ export function App() {
         autoStatus={autoStatus}
         autoMessage={autoMessage}
         autoDisabled={!activePhoto || autoStatus === "running"}
+        isAutoReady={isAutoReadyHighlighted && Boolean(activePhoto) && autoStatus !== "running"}
         onModeChange={setAppMode}
         onRunAuto={handleRunAuto}
       />
@@ -1904,6 +1919,7 @@ export function App() {
           onPrintSheet={handlePrintSheet}
           onZipExport={handleZipExport}
           onSeparateExport={handleBatchExport}
+          onModeChange={setAppMode}
         />
       </div>
 

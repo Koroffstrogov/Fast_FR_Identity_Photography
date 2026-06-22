@@ -15,7 +15,12 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   for (const modeLabel of ["Cadrer", "Fond", "Qualité", "Planche", "Export"]) {
     await expect(page.getByRole("button", { name: modeLabel, exact: true })).toBeVisible();
   }
-  await expect(page.getByRole("button", { name: "Auto", exact: true })).toBeDisabled();
+  const autoStartButton = page.getByRole("button", { name: /Génération automatique/ });
+  await expect(autoStartButton).toBeVisible();
+  await expect(autoStartButton).toBeDisabled();
+  await expect(page.getByText("Tout enchaîner")).toHaveCount(0);
+  await expect(page.getByText("Processus par étapes")).toHaveCount(0);
+  await expect(page.locator(".topbar-flow-separator")).toHaveText("ou");
 
   const canvas = page.getByLabel("Aperçu photo 35 par 45 millimètres");
   await expect(canvas).toHaveAttribute("width", "413");
@@ -60,6 +65,8 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   await expect(page.getByText("bob.png")).toBeVisible();
   await expect(page.getByText("2 images importées.")).toBeVisible();
   await expect(page.getByText("2 photos / 30 places")).toBeVisible();
+  await expect(autoStartButton).toBeEnabled();
+  await expect(autoStartButton).toHaveClass(/is-ready/);
   await expect(canvas).toBeVisible();
   await expect(page.getByText("Détails photo active")).toBeVisible();
   const firstPhotoCard = page.locator(".photo-list-item").first();
@@ -80,7 +87,12 @@ test("uses the desktop shell modes while keeping photo, sheet, background, and e
   expect(listBox).not.toBeNull();
   expect(firstCardBox).not.toBeNull();
   expect(firstCardBox!.y - listBox!.y).toBeLessThan(12);
-  await expect(page.getByRole("button", { name: "Auto", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+  await page.getByRole("button", { name: "Cadrer", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Cadrer", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
 
   await page.getByRole("button", { name: "Choisir alice.png" }).click();
   await expect(firstPhotoCard).toHaveClass(/is-active/);
@@ -533,6 +545,43 @@ test("newly imported photos become active and reopen crop", async ({ page }) => 
   await expect(page.getByRole("heading", { name: "third" })).toBeVisible();
 });
 
+test("right inspector next buttons navigate through the step flow", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Importer depuis le volet gauche").setInputFiles([
+    {
+      name: "step-flow.png",
+      mimeType: "image/png",
+      buffer: SAMPLE_PNG,
+    },
+  ]);
+
+  await expect(page.getByRole("button", { name: "Cadrer", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: "Suivant : Fond" }).click();
+  await expect(page.getByRole("button", { name: "Fond", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: "Suivant : Qualité" }).click();
+  await expect(page.getByRole("button", { name: "Qualité", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: "Suivant : Planche" }).click();
+  await expect(page.getByRole("button", { name: "Planche", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: "Suivant : Export" }).click();
+  await expect(page.getByRole("button", { name: "Export", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByRole("button", { name: "Export JPEG" })).toBeEnabled();
+});
+
 test("auto stops on face model failure and keeps the user on crop", async ({ page }) => {
   await page.route(/\/models\/mediapipe\/face_landmarker\.task.*/, async (route) => {
     await route.fulfill({
@@ -543,7 +592,8 @@ test("auto stops on face model failure and keeps the user on crop", async ({ pag
   });
 
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Auto", exact: true })).toBeDisabled();
+  const autoStartButton = page.getByRole("button", { name: /Génération automatique/ });
+  await expect(autoStartButton).toBeDisabled();
 
   await page.getByLabel("Importer depuis le volet gauche").setInputFiles([
     {
@@ -553,8 +603,8 @@ test("auto stops on face model failure and keeps the user on crop", async ({ pag
     },
   ]);
 
-  await expect(page.getByRole("button", { name: "Auto", exact: true })).toBeEnabled();
-  await page.getByRole("button", { name: "Auto", exact: true }).click();
+  await expect(autoStartButton).toBeEnabled();
+  await autoStartButton.click();
 
   await expect(page.getByRole("button", { name: "Cadrer", exact: true })).toHaveAttribute(
     "aria-pressed",
@@ -562,5 +612,5 @@ test("auto stops on face model failure and keeps the user on crop", async ({ pag
   );
   await expect(page.getByText(/Auto interrompu/).first()).toBeVisible();
   await expect(page.getByText(/Impossible de charger le modèle visage local/).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Auto", exact: true })).toBeEnabled();
+  await expect(autoStartButton).toBeEnabled();
 });

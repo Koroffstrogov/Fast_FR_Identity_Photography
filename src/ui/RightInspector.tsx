@@ -53,6 +53,7 @@ type RightInspectorProps = {
   onPrintSheet: () => void;
   onZipExport: () => void;
   onSeparateExport: () => void;
+  onModeChange: (mode: AppMode) => void;
 };
 
 export function RightInspector({
@@ -91,98 +92,157 @@ export function RightInspector({
   onPrintSheet,
   onZipExport,
   onSeparateExport,
+  onModeChange,
 }: RightInspectorProps) {
   return (
     <aside className="right-inspector" aria-label="Inspecteur">
-      <div className="inspector-heading">
-        <p className="eyebrow">Mode</p>
-        <h2>{getAppModeLabel(mode)}</h2>
-      </div>
-
-      {mode === "crop" && (
-        <div className="inspector-stack">
-          <GuideSection
-            photo={photo}
-            onGuideVisibilityChange={onGuideVisibilityChange}
-            onGuideOpacityChange={onGuideOpacityChange}
-          />
-          <FaceDetectionPanel
-            photo={photo}
-            modelStatus={faceModelStatus}
-            modelError={faceModelError}
-            interactionMode={editorInteractionMode}
-            onLoadModel={onLoadFaceModel}
-            onPlaceFacePointsAutomatically={onPlaceFacePointsAutomatically}
-            onInteractionModeChange={onEditorInteractionModeChange}
-            onFacePointsVisibilityChange={onFacePointsVisibilityChange}
-            onApplyFacePlacementFromPoints={onApplyFacePlacementFromPoints}
-            onDeleteFacePoints={onDeleteFacePoints}
-          />
+      <div className="right-inspector-content">
+        <div className="inspector-heading">
+          <p className="eyebrow">Mode</p>
+          <h2>{getAppModeLabel(mode)}</h2>
         </div>
-      )}
 
-      {mode === "background" && (
-        <BackgroundPanel
-          backgroundEdit={photo?.backgroundEdit}
-          disabled={!photo}
-          removalStatus={backgroundRemovalStatus}
-          removalError={backgroundRemovalError}
-          onLoadModel={onLoadBackgroundModel}
-          onDiagnoseSession={onDiagnoseBackgroundSession}
-          onRemoveBackground={onRemoveBackground}
-          onBackgroundChange={onBackgroundChange}
-          onResetSettings={onResetBackgroundSettings}
-        />
-      )}
+        {mode === "crop" && (
+          <div className="inspector-stack">
+            <GuideSection
+              photo={photo}
+              onGuideVisibilityChange={onGuideVisibilityChange}
+              onGuideOpacityChange={onGuideOpacityChange}
+            />
+            <FaceDetectionPanel
+              photo={photo}
+              modelStatus={faceModelStatus}
+              modelError={faceModelError}
+              interactionMode={editorInteractionMode}
+              onLoadModel={onLoadFaceModel}
+              onPlaceFacePointsAutomatically={onPlaceFacePointsAutomatically}
+              onInteractionModeChange={onEditorInteractionModeChange}
+              onFacePointsVisibilityChange={onFacePointsVisibilityChange}
+              onApplyFacePlacementFromPoints={onApplyFacePlacementFromPoints}
+              onDeleteFacePoints={onDeleteFacePoints}
+            />
+          </div>
+        )}
 
-      {mode === "quality" && (
-        <QualityPanel
-          photo={photo}
-          onQualityChange={onQualityChange}
-          onAutoQuality={onAutoQuality}
-          onResetQuality={onResetQuality}
-          onRecalculateQuality={onRecalculateQuality}
-        />
-      )}
-
-      {mode === "sheet" && (
-        <SheetInspector
-          photoCount={photoCount}
-          sheetMode={sheetMode}
-          composition={composition}
-          onSheetModeChange={onSheetModeChange}
-          onSheetExport={onSheetExport}
-          onPrintSheet={onPrintSheet}
-        />
-      )}
-
-      {mode === "export" && (
-        <div className="inspector-stack">
-          <button
-            type="button"
-            className="button-with-icon"
-            onClick={onExportPhoto}
+        {mode === "background" && (
+          <BackgroundPanel
+            backgroundEdit={photo?.backgroundEdit}
             disabled={!photo}
-          >
-            <ButtonIcon name="download" />
-            Export JPEG
-          </button>
-          <ExportPanel
+            removalStatus={backgroundRemovalStatus}
+            removalError={backgroundRemovalError}
+            onLoadModel={onLoadBackgroundModel}
+            onDiagnoseSession={onDiagnoseBackgroundSession}
+            onRemoveBackground={onRemoveBackground}
+            onBackgroundChange={onBackgroundChange}
+            onResetSettings={onResetBackgroundSettings}
+          />
+        )}
+
+        {mode === "quality" && (
+          <QualityPanel
+            photo={photo}
+            onQualityChange={onQualityChange}
+            onAutoQuality={onAutoQuality}
+            onResetQuality={onResetQuality}
+            onRecalculateQuality={onRecalculateQuality}
+          />
+        )}
+
+        {mode === "sheet" && (
+          <SheetInspector
             photoCount={photoCount}
-            fileNamingTemplate={fileNamingTemplate}
             sheetMode={sheetMode}
             composition={composition}
-            onFileNamingTemplateChange={onFileNamingTemplateChange}
             onSheetModeChange={onSheetModeChange}
             onSheetExport={onSheetExport}
             onPrintSheet={onPrintSheet}
-            onZipExport={onZipExport}
-            onSeparateExport={onSeparateExport}
           />
-        </div>
-      )}
+        )}
+
+        {mode === "export" && (
+          <div className="inspector-stack">
+            <button
+              type="button"
+              className="button-with-icon"
+              onClick={onExportPhoto}
+              disabled={!photo}
+            >
+              <ButtonIcon name="download" />
+              Export JPEG
+            </button>
+            <ExportPanel
+              photoCount={photoCount}
+              fileNamingTemplate={fileNamingTemplate}
+              sheetMode={sheetMode}
+              composition={composition}
+              onFileNamingTemplateChange={onFileNamingTemplateChange}
+              onSheetModeChange={onSheetModeChange}
+              onSheetExport={onSheetExport}
+              onPrintSheet={onPrintSheet}
+              onZipExport={onZipExport}
+              onSeparateExport={onSeparateExport}
+            />
+          </div>
+        )}
+      </div>
+
+      <InspectorNextAction
+        mode={mode}
+        hasPhoto={Boolean(photo)}
+        photoCount={photoCount}
+        onModeChange={onModeChange}
+      />
     </aside>
   );
+}
+
+function InspectorNextAction({
+  mode,
+  hasPhoto,
+  photoCount,
+  onModeChange,
+}: {
+  mode: AppMode;
+  hasPhoto: boolean;
+  photoCount: number;
+  onModeChange: (mode: AppMode) => void;
+}) {
+  const nextMode = getNextMode(mode);
+
+  if (!nextMode) {
+    return null;
+  }
+
+  const disabled = mode === "sheet" ? photoCount === 0 : !hasPhoto;
+
+  return (
+    <div className="inspector-next-action">
+      <button
+        type="button"
+        className="next-mode-button button-with-icon"
+        onClick={() => onModeChange(nextMode)}
+        disabled={disabled}
+      >
+        <span>Suivant : {getAppModeLabel(nextMode)}</span>
+        <ButtonIcon name="arrowRight" />
+      </button>
+    </div>
+  );
+}
+
+function getNextMode(mode: AppMode): AppMode | null {
+  switch (mode) {
+    case "crop":
+      return "background";
+    case "background":
+      return "quality";
+    case "quality":
+      return "sheet";
+    case "sheet":
+      return "export";
+    case "export":
+      return null;
+  }
 }
 
 function GuideSection({

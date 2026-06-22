@@ -981,8 +981,8 @@ button {
 
 .app-topbar {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) auto;
-  gap: 18px;
+  grid-template-columns: 260px minmax(620px, 1fr) minmax(190px, auto);
+  gap: 14px;
   align-items: center;
   min-width: 0;
   padding: 0 16px;
@@ -1015,17 +1015,100 @@ button {
   white-space: nowrap;
 }
 
+.topbar-center {
+  display: flex;
+  min-width: 0;
+  justify-content: center;
+  align-items: center;
+}
+
+.topbar-flow-actions {
+  display: flex;
+  width: min(100%, 720px);
+  min-width: 0;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+}
+
+.auto-flow-button {
+  gap: 8px;
+  min-height: 36px;
+  min-width: 218px;
+  border: 1px solid rgb(14 165 233 / 34%);
+  padding: 0 14px;
+  color: #f4f0f0;
+  background:
+    radial-gradient(circle at 16% 20%, rgb(255 255 255 / 30%), transparent 0%),
+    linear-gradient(135deg, rgb(50, 174, 133) 0%, rgb(12, 97, 136) 52%, rgb(124 58 237 / 100%) 100%);
+  box-shadow: 0 4px 12px rgb(14 165 233 / 14%);
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.auto-flow-button .button-icon {
+  width: 17px;
+  height: 17px;
+}
+
+.auto-flow-button strong {
+  overflow: hidden;
+  font-size: 0.86rem;
+  text-overflow: ellipsis;
+}
+
+.auto-flow-button.is-ready {
+  animation: auto-ready-glow 1.35s ease-in-out 3;
+}
+
+.auto-flow-button:hover:not(:disabled) {
+  filter: saturate(1.08) brightness(1.04);
+}
+
+.auto-flow-button:disabled {
+  border-color: #d4dbde;
+  color: #6b767c;
+  background: #dde4e2;
+  box-shadow: none;
+}
+
+.topbar-flow-separator {
+  color: #60717a;
+  font-size: 0.8rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+@keyframes auto-ready-glow {
+  0%,
+  100% {
+    transform: translateY(0);
+    box-shadow: 0 4px 12px rgb(14 165 233 / 14%);
+  }
+
+  50% {
+    transform: translateY(-1px);
+    box-shadow:
+      0 0 0 4px rgb(20 184 166 / 18%),
+      0 8px 18px rgb(124 58 237 / 24%);
+  }
+}
+
 .mode-nav {
   display: flex;
   min-width: 0;
-  gap: 6px;
+  gap: 5px;
   justify-content: center;
 }
 
 .mode-nav-button {
-  min-height: 36px;
+  min-height: 32px;
+  padding: 0 10px;
   color: #24343a;
   background: transparent;
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .mode-nav-button.is-active {
@@ -1034,16 +1117,11 @@ button {
 }
 
 .topbar-actions {
-  display: flex;
-  gap: 12px;
+  display: grid;
+  gap: 4px;
+  justify-items: end;
   align-items: center;
-}
-
-.auto-run-button {
-  min-height: 36px;
-  padding: 0 14px;
-  background: #0f766e;
-  white-space: nowrap;
+  min-width: 0;
 }
 
 .topbar-actions p {
@@ -1055,9 +1133,10 @@ button {
 }
 
 .topbar-actions .auto-status-message {
-  max-width: 320px;
+  max-width: 260px;
   overflow: hidden;
   color: #31515a;
+  font-size: 0.78rem;
   text-overflow: ellipsis;
 }
 
@@ -1103,12 +1182,12 @@ button {
   display: inline-grid;
   grid-auto-flow: column;
   gap: 8px;
-  min-height: 40px;
+  min-height: 55px;
   align-items: center;
   border-radius: 8px;
   padding: 0 18px;
   color: #ffffff;
-  background: #164e63;
+  background: #185c74;
   box-shadow: 0 8px 16px rgb(22 78 99 / 18%);
   cursor: pointer;
   font-size: 0.93rem;
@@ -1140,11 +1219,54 @@ button {
 }
 
 .right-inspector {
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
   border-left: 1px solid #c8d2ce;
   padding: 14px;
+  overflow: hidden;
+}
+
+.right-inspector-content {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.inspector-next-action {
+  flex: 0 0 auto;
+  z-index: 4;
+  margin: auto -14px -14px;
+  padding: 14px;
+  border-top: 1px solid #d7e0dc;
+  background: #f8faf9;
+}
+
+.next-mode-button {
+  width: 100%;
+  min-height: 48px;
+  justify-content: space-between;
+  border: 1px solid #0f766e;
+  padding: 0 18px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #0f766e, #0284c7);
+  box-shadow: 0 8px 18px rgb(15 118 110 / 18%);
+  font-size: 0.96rem;
+  font-weight: 900;
+}
+
+.next-mode-button:hover:not(:disabled) {
+  filter: brightness(1.04);
+}
+
+.next-mode-button:disabled {
+  border-color: #d4dbde;
+  color: #637179;
+  background: #d9dee2;
+  box-shadow: none;
 }
 
 .inspector-heading h2 {
