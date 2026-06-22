@@ -2061,3 +2061,115 @@ button {
   font-weight: 700;
   white-space: nowrap;
 }
+
+.auto-run-overlay {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(31 41 55 / 42%);
+  backdrop-filter: blur(2px) saturate(0.9);
+  pointer-events: auto;
+}
+
+.auto-run-overlay-panel {
+  display: grid;
+  gap: 18px;
+  justify-items: center;
+  color: #ffffff;
+  text-align: center;
+}
+
+.auto-run-overlay-panel p {
+  margin: 0;
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-radius: 999px;
+  padding: 8px 16px;
+  background: rgb(17 24 39 / 44%);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 16%);
+  font-size: 0.96rem;
+  font-weight: 850;
+}
+
+.auto-run-rectangles {
+  position: relative;
+  width: 168px;
+  height: 168px;
+  animation: auto-run-rectangles-spin 1.75s linear infinite;
+}
+
+.auto-run-rectangles span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 58px;
+  aspect-ratio: 35 / 45;
+  border: 2px solid rgb(255 255 255 / 78%);
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 68%), rgb(255 255 255 / 20%)),
+    linear-gradient(135deg, rgb(20 184 166 / 52%), rgb(14 165 233 / 46%));
+  box-shadow: 0 12px 30px rgb(0 0 0 / 18%);
+  transform: translate(-50%, -50%) rotate(var(--auto-run-angle)) translateY(-42px);
+}
+
+.auto-run-rectangles span:nth-child(1) {
+  --auto-run-angle: 0deg;
+}
+
+.auto-run-rectangles span:nth-child(2) {
+  --auto-run-angle: 72deg;
+}
+
+.auto-run-rectangles span:nth-child(3) {
+  --auto-run-angle: 144deg;
+}
+
+.auto-run-rectangles span:nth-child(4) {
+  --auto-run-angle: 216deg;
+}
+
+.auto-run-rectangles span:nth-child(5) {
+  --auto-run-angle: 288deg;
+}
+
+.auto-run-counter {
+  position: fixed;
+  right: 18px;
+  bottom: 14px;
+  min-width: 48px;
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: rgb(255 255 255 / 82%);
+  background: rgb(17 24 39 / 34%);
+  font-size: 0.82rem;
+  font-weight: 850;
+  text-align: center;
+}
+
+@keyframes auto-run-rectangles-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auto-run-rectangles {
+    animation: auto-run-rectangles-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes auto-run-rectangles-pulse {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(0.98);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}

@@ -64,6 +64,7 @@ import {
   getDefaultQualityEditState,
 } from "../quality/quality-state";
 import { BottomToolbar } from "./BottomToolbar";
+import { AutoRunOverlay } from "./AutoRunOverlay";
 import { LeftPhotoPanel } from "./LeftPhotoPanel";
 import { RightInspector } from "./RightInspector";
 import { TopBar } from "./TopBar";
@@ -145,6 +146,8 @@ export function App() {
   const [autoStatus, setAutoStatus] = useState<AutoStatus>("idle");
   const [autoStep, setAutoStep] = useState<AutoStep | null>(null);
   const [autoMessage, setAutoMessage] = useState("");
+  const [autoStartedAtMs, setAutoStartedAtMs] = useState<number | null>(null);
+  const [autoElapsedSeconds, setAutoElapsedSeconds] = useState(0);
   const [isAutoReadyHighlighted, setIsAutoReadyHighlighted] = useState(false);
   const [editorInteractionMode, setEditorInteractionMode] =
     useState<EditorInteractionMode>("move-photo");
@@ -178,6 +181,23 @@ export function App() {
 
     return () => window.clearTimeout(timeoutId);
   }, [isAutoReadyHighlighted]);
+
+  useEffect(() => {
+    if (autoStatus !== "running" || autoStartedAtMs === null) {
+      return;
+    }
+
+    const startedAtMs = autoStartedAtMs;
+
+    function updateElapsedSeconds() {
+      setAutoElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000)));
+    }
+
+    updateElapsedSeconds();
+    const intervalId = window.setInterval(updateElapsedSeconds, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [autoStatus, autoStartedAtMs]);
 
   useEffect(() => {
     const photoCanvas = photoCanvasRef.current;
@@ -582,6 +602,8 @@ export function App() {
     setAutoStatus("running");
     setAutoStep("crop");
     setAutoMessage(`Auto en cours : ${getAutoStepLabel("crop")}`);
+    setAutoStartedAtMs(Date.now());
+    setAutoElapsedSeconds(0);
     setError("");
 
     try {
@@ -592,6 +614,8 @@ export function App() {
       setAutoStatus("done");
       setAutoStep("sheet");
       setAutoMessage("Auto terminé. Vérifiez la planche avant export ou impression.");
+      setAutoStartedAtMs(null);
+      setAutoElapsedSeconds(0);
       setAppMode("sheet");
       setError("");
     } catch (autoError) {
@@ -599,6 +623,8 @@ export function App() {
         setAutoStatus("error");
         setAutoStep(autoError.step);
         setAutoMessage(`Auto interrompu : ${autoError.message}`);
+        setAutoStartedAtMs(null);
+        setAutoElapsedSeconds(0);
         setAppMode(autoError.mode);
         setError(autoError.message);
         return;
@@ -608,6 +634,8 @@ export function App() {
       setAutoStatus("error");
       setAutoStep(null);
       setAutoMessage(`Auto interrompu : ${message}`);
+      setAutoStartedAtMs(null);
+      setAutoElapsedSeconds(0);
       setError(message);
     }
   }
@@ -1931,6 +1959,13 @@ export function App() {
         onTransformChange={handleTransformChange}
         onResetPhoto={handleResetActivePhoto}
       />
+
+      {autoStatus === "running" && (
+        <AutoRunOverlay
+          message={autoMessage || "Auto en cours"}
+          elapsedSeconds={autoElapsedSeconds}
+        />
+      )}
     </div>
   );
 }

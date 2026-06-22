@@ -584,6 +584,7 @@ test("right inspector next buttons navigate through the step flow", async ({ pag
 
 test("auto stops on face model failure and keeps the user on crop", async ({ page }) => {
   await page.route(/\/models\/mediapipe\/face_landmarker\.task.*/, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 800));
     await route.fulfill({
       status: 404,
       contentType: "text/plain",
@@ -606,10 +607,18 @@ test("auto stops on face model failure and keeps the user on crop", async ({ pag
   await expect(autoStartButton).toBeEnabled();
   await autoStartButton.click();
 
+  const autoOverlay = page.getByRole("status", {
+    name: "Génération automatique en cours",
+  });
+  await expect(autoOverlay).toBeVisible();
+  await expect(autoOverlay).toContainText(/Auto en cours/);
+  await expect(page.getByLabel("Temps écoulé")).toHaveText(/\d+ s/);
+
   await expect(page.getByRole("button", { name: "Cadrer", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
+  await expect(autoOverlay).toHaveCount(0);
   await expect(page.getByText(/Auto interrompu/).first()).toBeVisible();
   await expect(page.getByText(/Impossible de charger le modèle visage local/).first()).toBeVisible();
   await expect(autoStartButton).toBeEnabled();
