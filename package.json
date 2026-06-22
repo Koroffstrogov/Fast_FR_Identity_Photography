@@ -5,11 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "electron:dev": "node scripts/electron-dev.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "package:portable": "node scripts/package-portable.mjs",
+    "package:nas": "node scripts/package-nas.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^0.10.35",
@@ -24,6 +27,8 @@
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@vitejs/plugin-react": "latest",
+    "electron": "^42.4.1",
+    "electron-builder": "^26.15.3",
     "typescript": "latest",
     "vite": "latest",
     "vitest": "latest"

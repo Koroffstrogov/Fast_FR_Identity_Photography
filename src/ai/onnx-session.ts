@@ -18,6 +18,7 @@ import {
   RmbgModelConfig,
   RMBG_DEFAULT_CONFIG,
   getRmbgEngineLabel,
+  getRmbgModelFileName,
   getRmbgLocalModelPath,
 } from "../background/rmbg-config";
 
@@ -182,7 +183,7 @@ export async function loadLocalOnnxModel(
 
   if (!response.ok) {
     throw new Error(
-      `Modèle ${getRmbgEngineLabelFromModelPath(modelPath)} introuvable. En développement, placez le fichier dans ${getRmbgLocalModelPath(modelPath)}. URL testée : ${probe.requestedUrl} (HTTP ${response.status}).`,
+      `Modèle ${getRmbgEngineLabelFromModelPath(modelPath)} introuvable. ${getModelLocationHint(modelPath, probe.currentOrigin)} URL testée : ${probe.requestedUrl} (HTTP ${response.status}).`,
     );
   }
 
@@ -196,8 +197,7 @@ export async function loadLocalOnnxModel(
     throw new Error(
       [
         "Le chemin du modèle renvoie l'application HTML.",
-        `Vérifiez le port, le middleware Vite et la présence du fichier ${getRmbgLocalModelPath(modelPath)}.`,
-        "En build statique, fournissez vous-même le modèle à l'URL attendue.",
+        getModelLocationHint(modelPath, probe.currentOrigin),
         `Origin courant : ${probe.currentOrigin ?? "inconnu"}.`,
         `URL testée : ${probe.requestedUrl}.`,
         `Content-Type : ${probe.contentType || "inconnu"}.`,
@@ -297,6 +297,17 @@ function getCurrentOrigin(): string | undefined {
   }
 
   return window.location.origin;
+}
+
+function getModelLocationHint(modelPath: string, currentOrigin: string | undefined): string {
+  if (currentOrigin?.startsWith("photoid://")) {
+    return `Dans la distribution portable, vérifiez le fichier models/rmbg1.4/${getRmbgModelFileName(modelPath)} à côté de PhotoID.exe.`;
+  }
+
+  return [
+    `En développement, placez le fichier dans ${getRmbgLocalModelPath(modelPath)}.`,
+    "En build statique, fournissez vous-même le modèle à l'URL attendue.",
+  ].join(" ");
 }
 
 function getFallbackMessage(

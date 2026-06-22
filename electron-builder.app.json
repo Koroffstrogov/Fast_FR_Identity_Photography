@@ -1,0 +1,47 @@
+{
+  "appId": "fr.photoid.desktop",
+  "productName": "PhotoID",
+  "copyright": "Copyright © 2026",
+  "asar": true,
+  "npmRebuild": false,
+  "directories": {
+    "output": "release/portable"
+  },
+  "files": [
+    "electron/main.cjs",
+    "package.json"
+  ],
+  "extraMetadata": {
+    "main": "electron/main.cjs"
+  },
+  "extraFiles": [
+    {
+      "from": "dist",
+      "to": "app",
+      "filter": ["**/*"]
+    },
+    {
+      "from": "public/ort",
+      "to": "ort",
+      "filter": ["**/*"]
+    },
+    {
+      "from": "public/models/mediapipe",
+      "to": "models/mediapipe",
+      "filter": ["**/*"]
+    },
+    {
+      "from": "local-models/rmbg1.4",
+      "to": "models/rmbg1.4",
+      "filter": ["model_fp16.onnx", "model_quantized.onnx"]
+    }
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "dir",
+        "arch": ["x64"]
+      }
+    ]
+  }
+}

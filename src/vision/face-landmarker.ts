@@ -64,8 +64,9 @@ export function getFaceLandmarkerErrorMessage(error: unknown): string {
   return [
     "Impossible de charger le modèle visage local.",
     `Vérifiez la présence de ${FACE_LANDMARKER_MODEL_PATH} et des fichiers WASM dans ${FACE_LANDMARKER_WASM_PATH}.`,
+    getFaceLandmarkerModelLocationHint(),
     detail,
-  ].join(" ");
+  ].filter(Boolean).join(" ");
 }
 
 async function createFaceLandmarker(): Promise<FaceLandmarker> {
@@ -176,4 +177,12 @@ function looksLikeHtml(buffer: Uint8Array): boolean {
     .toLowerCase();
 
   return prefix.startsWith("<!doctype html") || prefix.startsWith("<html");
+}
+
+function getFaceLandmarkerModelLocationHint(): string {
+  if (typeof window !== "undefined" && window.location.origin.startsWith("photoid://")) {
+    return "Dans la distribution portable, vérifiez que le dossier models/mediapipe est présent à côté de PhotoID.exe.";
+  }
+
+  return "";
 }

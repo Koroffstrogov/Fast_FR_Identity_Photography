@@ -1,0 +1,26 @@
+{
+  "appId": "fr.photoid.launcher",
+  "productName": "PhotoID Launcher",
+  "copyright": "Copyright © 2026",
+  "asar": true,
+  "npmRebuild": false,
+  "directories": {
+    "output": "release/launcher"
+  },
+  "files": [
+    "electron/launcher.cjs",
+    "package.json"
+  ],
+  "extraMetadata": {
+    "main": "electron/launcher.cjs"
+  },
+  "win": {
+    "target": [
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "artifactName": "PhotoID-Launcher.exe"
+  }
+}

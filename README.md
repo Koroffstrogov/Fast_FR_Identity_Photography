@@ -212,6 +212,84 @@ Le build doit rester utilisable hors ligne apres chargement initial, a condition
 que les assets runtime soient presents et que le serveur statique fournisse les
 modeles attendus. Le dossier `local-models/` n'est pas copie dans `dist/`.
 
+## Packaging NAS portable Windows
+
+Le packaging NAS cree une distribution Windows pour utilisateurs novices. Ils
+lancent uniquement `PhotoID-Launcher.exe` depuis le NAS ; le launcher copie la
+release dans `%LOCALAPPDATA%\PhotoID\<version>\`, puis lance l'application depuis
+le disque local. Cela evite d'executer Electron, les assets ORT et les modeles IA
+directement depuis le NAS.
+
+Commandes disponibles :
+
+```powershell
+npm run electron:dev
+npm run package:portable
+npm run package:nas
+```
+
+`npm run electron:dev` demarre Vite sur `http://127.0.0.1:5173` puis ouvre
+Electron. Le mode web existant `npm run dev` reste inchange.
+
+Avant `package:portable` ou `package:nas`, les fichiers suivants doivent etre
+presents localement :
+
+```text
+public/models/mediapipe/face_landmarker.task
+public/models/mediapipe/wasm/vision_wasm_internal.js
+public/models/mediapipe/wasm/vision_wasm_internal.wasm
+local-models/rmbg1.4/model_fp16.onnx
+local-models/rmbg1.4/model_quantized.onnx
+public/ort/ort-wasm-simd-threaded.asyncify.mjs
+public/ort/ort-wasm-simd-threaded.asyncify.wasm
+```
+
+Les modeles ne sont pas commites et ne sont pas copies dans `dist/` par le build
+Vite standard. Ils sont uniquement copies dans la release Electron/NAS au moment
+du packaging.
+
+Structure NAS produite par `npm run package:nas` :
+
+```text
+release/nas/PhotoID/
+  PhotoID-Launcher.exe
+  manifest.json
+  releases/
+    <version>/
+      PhotoID.exe
+      app/
+      models/
+        mediapipe/
+          face_landmarker.task
+          wasm/
+        rmbg1.4/
+          model_fp16.onnx
+          model_quantized.onnx
+      ort/
+      resources/
+      locales/
+```
+
+Structure locale creee au lancement :
+
+```text
+%LOCALAPPDATA%/PhotoID/
+  <version>/
+    PhotoID.exe
+    app/
+    models/
+    ort/
+    resources/
+```
+
+Pour creer une nouvelle version :
+
+1. modifier `version` dans `package.json` ;
+2. verifier que `local-models/rmbg1.4/` contient les modeles requis ;
+3. lancer `npm run package:nas` ;
+4. copier le contenu de `release/nas/PhotoID/` sur le NAS ;
+5. demander aux utilisateurs de lancer `PhotoID-Launcher.exe`.
+
 ## Configuration des modeles locaux
 
 ### Detection visage MediaPipe
